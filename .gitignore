@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pycache/
+*.pyc
+.DS_Store
+.env
+data/screener_latest.csv
+data/fill_prices.csv
+data/market/
+logs/
+charts/
+.github-sync/
+.ipynb_checkpoints/
+node_modules/
+dist/
