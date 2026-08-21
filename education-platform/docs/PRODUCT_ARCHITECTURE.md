@@ -23,9 +23,18 @@ Student Raw Data
 → Future Model Improvement
 ```
 
-The current implementation intentionally covers only the database foundation,
-NYU MSQE golden record, provenance, versioning, and tests. The principles below
-define migration direction without authorizing speculative tables or services.
+The current implementation covers the frozen Phase 1 database foundation, the
+frozen Phase 2 Student Eligibility v0.1 contract, the Phase 3 Fit v0.1
+database/persistence layer frozen separately in migrations `009`–`011`
+([`PHASE_3_DATABASE_FREEZE.md`](PHASE_3_DATABASE_FREEZE.md)), and Migration
+`012` Foundation Hardening / Gate 1
+([`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md)).
+The design-only engine milestone is [`PHASE_3_FIT_ENGINE_PLAN.md`](PHASE_3_FIT_ENGINE_PLAN.md).
+Phase 3 overall remains unfrozen and has no final tag. Its TypeScript
+evaluator, API, score, ranking, recommendation, Competitiveness, and Admission
+Probability are not implemented or authorized. The next authorized phase is
+Migration 013 — Eligibility Correctness v0.2. The principles below define
+migration direction without authorizing speculative tables or services.
 
 ## 1. Raw data and derived data
 
@@ -152,8 +161,8 @@ statistical methodology.
 
 ## 9. Uncertainty is first-class
 
-Recommendations must eventually report more than a score. Outputs should
-support:
+If a later, explicitly versioned phase introduces numerical scores, outputs
+must report more than a score and should support:
 
 - score
 - confidence
@@ -169,6 +178,10 @@ Evidence Coverage: 91%
 
 Confidence and evidence coverage are separate from the score. Sparse, stale,
 inapplicable, or conflicting inputs must reduce confidence.
+
+This is not the Phase 3 v0.1 contract. Fit v0.1 uses categorical per-dimension
+conclusions with reasons and uncertainty and defines no numerical or composite
+Fit Score.
 
 ## 10. International-student outcomes are distinct
 
@@ -241,13 +254,29 @@ objective.
 
 ## 15. Current MVP scope
 
-The current milestone remains:
+Completed and frozen:
 
-- database foundation
-- NYU MSQE golden record
-- provenance
-- versioning
-- tests
+- Phase 1 database foundation, NYU MSQE golden record, provenance, versioning,
+  and regression tests;
+- Phase 2 Student Eligibility v0.1, including student evidence, completeness,
+  reviewed mappings, verified rule trees, deterministic evaluation, privacy,
+  and replay contracts;
+- Migration `012` Foundation Hardening / Gate 1, additive over `001`–`011`;
+  see [`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md).
+
+Current approved semantic contract:
+
+- Phase 3 Fit product semantics and boundaries;
+- multidimensional categorical conclusions, evidence-backed reasons, and
+  separate confidence and categorical evidence coverage;
+- no composite Fit Score, ranking, competitiveness, or probability.
+
+Current implementation milestone: the Phase 3 Fit v0.1 database contract is
+frozen in migrations `009`–`011` and SQL tests. Migration `012` Foundation
+Hardening is **FROZEN**. The next authorized phase is Migration 013 —
+Eligibility Correctness v0.2. The Fit TypeScript evaluator is not implemented;
+Phase 3 overall is not frozen, and there is no final Phase 3 tag. Fit Engine
+implementation is not authorized by the 012 freeze.
 
 Do not implement the full future architecture now. Add no speculative tables,
 services, matching engines, or model pipelines merely because they appear in
