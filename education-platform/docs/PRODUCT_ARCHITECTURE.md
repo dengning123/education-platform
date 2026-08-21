@@ -28,12 +28,14 @@ frozen Phase 2 Student Eligibility v0.1 contract, the Phase 3 Fit v0.1
 database/persistence layer frozen separately in migrations `009`–`011`
 ([`PHASE_3_DATABASE_FREEZE.md`](PHASE_3_DATABASE_FREEZE.md)), and Migration
 `012` Foundation Hardening / Gate 1
-([`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md)).
+([`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md)),
+and Migration `013` Eligibility Correctness v0.2
+([`PHASE_2_ELIGIBILITY_V02_FREEZE.md`](PHASE_2_ELIGIBILITY_V02_FREEZE.md)).
 The design-only engine milestone is [`PHASE_3_FIT_ENGINE_PLAN.md`](PHASE_3_FIT_ENGINE_PLAN.md).
 Phase 3 overall remains unfrozen and has no final tag. Its TypeScript
 evaluator, API, score, ranking, recommendation, Competitiveness, and Admission
-Probability are not implemented or authorized. The next authorized phase is
-Migration 013 — Eligibility Correctness v0.2. The principles below define
+Probability are not implemented or authorized. This freeze does not authorize
+Migration 014 or Fit Engine implementation. The principles below define
 migration direction without authorizing speculative tables or services.
 
 ## 1. Raw data and derived data
@@ -262,7 +264,9 @@ Completed and frozen:
   reviewed mappings, verified rule trees, deterministic evaluation, privacy,
   and replay contracts;
 - Migration `012` Foundation Hardening / Gate 1, additive over `001`–`011`;
-  see [`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md).
+  see [`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md);
+- Migration `013` Eligibility Correctness v0.2, additive over frozen `012`;
+  see [`PHASE_2_ELIGIBILITY_V02_FREEZE.md`](PHASE_2_ELIGIBILITY_V02_FREEZE.md).
 
 Current approved semantic contract:
 
@@ -273,10 +277,12 @@ Current approved semantic contract:
 
 Current implementation milestone: the Phase 3 Fit v0.1 database contract is
 frozen in migrations `009`–`011` and SQL tests. Migration `012` Foundation
-Hardening is **FROZEN**. The next authorized phase is Migration 013 —
-Eligibility Correctness v0.2. The Fit TypeScript evaluator is not implemented;
-Phase 3 overall is not frozen, and there is no final Phase 3 tag. Fit Engine
-implementation is not authorized by the 012 freeze.
+Hardening is **FROZEN**. Migration 013 — Eligibility Correctness v0.2 is
+**FROZEN**
+([`PHASE_2_ELIGIBILITY_V02_FREEZE.md`](PHASE_2_ELIGIBILITY_V02_FREEZE.md)).
+The Fit TypeScript evaluator is not implemented;
+Phase 3 overall is not frozen, and there is no final Phase 3 tag. This freeze
+does not authorize Migration 014 or Fit Engine implementation.
 
 Do not implement the full future architecture now. Add no speculative tables,
 services, matching engines, or model pipelines merely because they appear in

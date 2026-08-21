@@ -38,6 +38,8 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f supabase/tests/003_phase3_fit.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f supabase/tests/004_phase012_foundation_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/005_phase013_eligibility_v02.sql
 ```
 
 The SQL tests run inside transactions and roll back their fixtures. They exit
@@ -82,6 +84,11 @@ npm test
     evidence applicability, immutable source revisions, and privacy closure
     over `001`–`011`. Frozen; see
     [docs/PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md](docs/PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md).
+13. `202608200013_eligibility_correctness_v02.sql` — Eligibility
+    Correctness v0.2: copy-at-use pins, closed-world snapshots,
+    sealed replay, projections/`ABSENT`, taxonomy ordinals, and v0.1
+    coexistence. Frozen; see
+    [docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md](docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md).
 
 ## Rules for data changes
 
@@ -123,5 +130,9 @@ score, ranking, probability, or recommendation implementation.
 Migration `012` Foundation Hardening / Gate 1 is **FROZEN**; its
 change-control record is
 [docs/PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md](docs/PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md).
-The next authorized phase is Migration 013 — Eligibility Correctness v0.2.
-Fit Engine implementation is not authorized by this freeze.
+Migration 013 — Eligibility Correctness v0.2 is **FROZEN**; its
+change-control record is
+[docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md](docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md).
+The implementation contract remains
+[docs/PHASE_2_ELIGIBILITY_V02_PLAN.md](docs/PHASE_2_ELIGIBILITY_V02_PLAN.md).
+This freeze does not authorize Migration 014 or Fit Engine implementation.
