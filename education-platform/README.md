@@ -283,3 +283,11 @@ cleaned up. The release evidence is recorded in
 [docs/PHASE_3_PRODUCTION_RELEASE_CANDIDATE.md](docs/PHASE_3_PRODUCTION_RELEASE_CANDIDATE.md),
 and the authoritative final state is
 [docs/PHASE_3_FREEZE.md](docs/PHASE_3_FREEZE.md).
+
+Phase 4 is currently planning-only. The production observability and minimum
+product-loop plan is
+[docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md](docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
+The proposed Application/Outcome data contract is
+[docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 019 SQL, Application/Outcome runtime, or Competitiveness model is
+implemented or authorized by those documents.

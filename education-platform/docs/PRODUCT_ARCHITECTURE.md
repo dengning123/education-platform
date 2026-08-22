@@ -320,6 +320,15 @@ to the versioned, independently reviewed same-currency annualization contracts
 in Migration `017`; unsupported conversion or review states fail closed.
 Ranking, probability, recommendation, and Competitiveness remain unimplemented.
 
+The next planning milestone is Phase 4 production observability and a minimum
+authenticated product loop; see
+[`PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md`](PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
+The separately bounded Migration 019 Application/Outcome proposal is recorded
+in
+[`MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+Both are planning-only. No Migration 019 SQL or Competitiveness implementation
+exists.
+
 Do not implement the full future architecture now. Add no speculative tables,
 services, matching engines, or model pipelines merely because they appear in
 this document.
