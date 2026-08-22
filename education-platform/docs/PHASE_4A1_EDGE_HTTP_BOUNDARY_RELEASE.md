@@ -1,10 +1,11 @@
 # Phase 4A-1 Edge HTTP Boundary Release
 
-Status: **IMPLEMENTED, DEPLOYED, AND REMOTELY VERIFIED**
+Status: **IMPLEMENTED, DEPLOYED, AND REMOTELY VERIFIED WITH ONE EXTERNAL
+GATEWAY FINDING**
 
 Date: 2026-08-22
 
-Source build: `4937ce0b4bf97f0de3190b0b202875f1b2198f12`
+Source build: `099a348e6b2ea9dc757efa2faacc675ba673ad5d`
 
 Phase 3 semantic baseline: tag `phase3-fit-v0.1`, commit
 `55296e1aeca9a25b066e9010c376f0e618af59d1`
@@ -19,19 +20,29 @@ Fit Edge Functions:
 - an exact environment-backed browser-origin allowlist with no wildcard and
   no credential/cookie grant;
 - strict `POST`/`OPTIONS`, JSON content type, and bounded request-body handling;
+- a 50-second cooperative request deadline and 10-second per-dependency
+  deadline, both propagated to the actual gateway `fetch` abort signal;
 - a closed public error catalog that never returns adapter messages,
   PostgREST details, SQL text, hints, or nested causes;
-- allowlisted operational events containing endpoint, release/build identity,
-  stage, status class, stable error code, duration, and cold-start state only;
+- typed and defensively bounded operational events containing only endpoint,
+  semantic release, deployed build, boundary version, stage, status class,
+  stable error code, duration, and cold-start state;
 - refactored `fit-evaluate`, `fit-normalization-prepare`,
   `fit-normalization-review`, and `fit-normalization-resume` entrypoints with
-  byte-compatible success JSON.
+  semantically and schema-compatible success JSON.
 
 Production configuration is:
 
 - `FIT_EDGE_ALLOWED_ORIGINS=none` because no browser UI is deployed;
-- `FIT_EDGE_RELEASE_ID=phase4a1`;
-- `FIT_EDGE_BUILD_HASH=4937ce0b4bf97f0de3190b0b202875f1b2198f12`.
+- `FIT_EDGE_SEMANTIC_RELEASE=fit-v0.1`;
+- `FIT_EDGE_DEPLOYED_BUILD=099a348e6b2ea9dc757efa2faacc675ba673ad5d`;
+- `FIT_EDGE_REQUEST_DEADLINE_MS=50000`;
+- `FIT_EDGE_DEPENDENCY_DEADLINE_MS=10000`;
+- code-owned `EDGE_HTTP_BOUNDARY_VERSION=fit-edge-http-v1`.
+
+Remote configuration digests were compared mechanically with these exact
+values. The older `FIT_EDGE_RELEASE_ID` and `FIT_EDGE_BUILD_HASH` settings
+remain present but are not read by this boundary version.
 
 The source implementation is in:
 
@@ -40,22 +51,40 @@ The source implementation is in:
 - the four existing function `index.ts` entrypoints;
 - `supabase/functions/.env.example` and the shared boundary README.
 
-## 2. Safe deadline disposition
+## 2. Inspected executable path and deadline contract
 
-The final review rejected an intermediate `Promise.race` timeout. The frozen
-Fit runtime cannot cancel in-flight database work, so returning `504` while a
-finalizer may still commit would make retries unsafe and could duplicate an
-evaluation. Phase 4A-1 therefore does not pretend to provide operation
-cancellation.
+The executable-path review started from the four deployed entrypoints, not a
+planned wrapper path:
 
-A hard application deadline remains a later observability/reliability
-increment. It requires end-to-end abort propagation or a mechanically proven
-idempotency receipt before it may alter responses. The platform's own runtime
-limit remains unchanged.
+- `supabase/functions/fit-evaluate/index.ts`;
+- `supabase/functions/fit-normalization-prepare/index.ts`;
+- `supabase/functions/fit-normalization-review/index.ts`;
+- `supabase/functions/fit-normalization-resume/index.ts`.
+
+All four call the frozen `_shared/fit-runtime.js`. The corresponding source
+gateway in `packages/fit-engine-adapter/src/database-gateway.ts` accepts an
+injected `fetch` implementation as its fourth constructor argument. That real
+extension point is now used by each entrypoint; the frozen runtime itself is
+unchanged.
+
+The executable inspection confirmed two pre-change defects: the shared
+boundary had no request/dependency deadline, and operational events had only
+generic release/build fields with no explicit semantic-release versus
+deployed-build contract or boundary-version identity. Existing CORS, request
+ID, body limit, public-error catalog, and success schemas were retained rather
+than rewritten.
+
+The implementation does not race the entire handler and return while an
+uncancelled finalizer continues. It bounds body reads and propagates request
+and dependency aborts into the actual database network request. The stable
+closed deadline codes are `REQUEST_ABORTED`, `REQUEST_DEADLINE_EXCEEDED`, and
+`DEPENDENCY_DEADLINE_EXCEEDED`. As with any aborted database network request,
+callers must still respect the existing finalization/idempotency contract when
+the server-side commit outcome is ambiguous.
 
 ## 3. Local verification
 
-- shared HTTP boundary: 16/16 pure unit and adversarial tests passed;
+- shared HTTP boundary: 21/21 pure unit and adversarial tests passed;
 - all four Edge entrypoints bundled successfully;
 - Fit Engine: 14/14 tests passed;
 - Fit adapter: 8/8 tests passed;
@@ -66,21 +95,35 @@ limit remains unchanged.
   SHA-256
   `0c6344b98b93ea38282236ac437bd8bc71eec3804bc103d7b09ad6ef790fd5b1`.
 
-The boundary attack suite covers trusted/request-supplied request IDs,
+The boundary attack suite covers trusted/request-supplied request IDs and
+invalid UUID generator output,
 allowlisted and denied origins, preflight methods/headers, non-browser
 requests, authentication, method and media-type rejection, malformed or
 oversized JSON, raw exception redaction, structured-log field allowlisting,
-invalid deployment configuration, and deny-all production origin behavior.
+invalid deployment configuration, stalled body reads, request abort,
+dependency abort, and deny-all production origin behavior.
 
 ## 4. Remote deployment and smoke
 
-Project `lmcqotzbaoetnxceriwq` has all four functions ACTIVE at version 5 with
-JWT verification enabled. Remote configuration names and digests were read
-back without revealing values.
+Project `lmcqotzbaoetnxceriwq` has all four functions ACTIVE at final
+configuration version 9 with JWT verification enabled. Version 8 is the source
+deployment and version 9 reuses that source after restoring production Origin
+configuration to `none`. Remote configuration names and digests were read back
+without revealing values.
+
+The version-8 source bundle digests are:
+
+- `fit-evaluate`: `eaac9a9a44592152d4f58b2759941b8a598c88e0de8c665e8c8b63eb0ab64dce`;
+- `fit-normalization-prepare`: `be9493f5b6db71ed6d9ee3df3bfe49f5059943b71b5fba6c8e01c46cfcf7d956`;
+- `fit-normalization-review`: `bf437c5cfeea23e33459fd63f2adad53ec5769b0995f83d4d1213c7b6003ab07`;
+- `fit-normalization-resume`: `743f248893351ae886ba3b0cabafab72ef48b5cf6fc5f1f3cdd8d5a4674cb963`.
 
 The final source-build smoke verified:
 
-- all four credential-free requests were rejected with HTTP 401;
+- all four credential-free requests were rejected with HTTP 401 by the
+  Supabase JWT gateway;
+- a temporary exact Origin passed preflight and received that same exact
+  `Access-Control-Allow-Origin` value plus `Vary: Origin`;
 - an authenticated request with an unapproved browser Origin was rejected
   with HTTP 403 and no CORS grant;
 - authenticated `fit-evaluate` completed with six categorical dimensions,
@@ -92,8 +135,13 @@ The final source-build smoke verified:
   `ALIGNMENT / MEDIUM / SUFFICIENT`;
 - response scans found no score, weight, rank, probability, recommendation,
   Competitiveness, or Eligibility semantics;
-- every exercised Edge failure body contained only stable `error` and
-  server-generated `requestId` fields.
+- every exercised failure that reached the shared boundary contained only
+  stable `error` and server-generated `requestId` fields;
+- malformed JSON, unsupported media type, oversized body, blocked Origin, and
+  independent-review rejection all had closed boundary envelopes;
+- after restoring production `none`, browser preflight and actual browser
+  Origin were denied while an authenticated no-Origin request still reached
+  the boundary normally.
 
 The smoke read API keys and held passwords, access tokens, and temporary UUIDs
 inside one process only. None were printed or written to files.
@@ -108,11 +156,12 @@ Final count-only audits confirmed:
 - active Phase 4A-1 smoke costs: zero;
 - golden program version still active: exactly one.
 
-Four disposable cost records are retired historical provenance. Three came
-from diagnostic smoke attempts that progressed far enough to create a valid
-isolated catalog fixture before a later assertion failed; the fourth is the
-final passing smoke. Their immutable evidence and observations remain by
-design, but no retired record is admissible to a new Fit evaluation.
+This supplemental validation created three isolated cost records: two runs
+progressed through a valid catalog fixture before a later smoke assertion
+failed, and the third was the final passing run. All three are retired. Together
+with the four records documented by the earlier Phase 4A-1 release pass, seven
+disposable retired records remain as immutable provenance. No retired record
+is admissible to a new Fit evaluation.
 
 ## 6. Exclusions and next authorization boundary
 
@@ -120,6 +169,15 @@ This release did not modify migrations `001`–`018`, the generated Fit runtime,
 Fit/Eligibility packages or semantics, evaluator identity, result schemas,
 UI, Migration 019, Application/Outcome runtime, or Competitiveness.
 
-Phase 4A-1 is complete. Dashboards/alerts, durable telemetry, cancellable
-deadlines, the minimum product UI, Migration 019, and Competitiveness remain
-separate future increments requiring explicit authorization.
+One external gateway finding remains: a credential-free request is rejected
+before the function executes because `verify_jwt=true`. The platform response
+uses `code`/`message` and has no shared-boundary request ID. Making that
+pre-function response conform would require changing the platform JWT boundary
+or adding an outer proxy. Neither was authorized, so JWT verification remains
+enabled and this was not changed. The shared closed-envelope contract applies
+to requests admitted to the function.
+
+Phase 4A-1 is complete within its authorized application boundary. No
+dashboard, monitoring vendor, durable trace/audit table, metrics warehouse,
+general tracing framework, UI, Migration 019, Competitiveness implementation,
+or Phase 4A-2 work was started.
