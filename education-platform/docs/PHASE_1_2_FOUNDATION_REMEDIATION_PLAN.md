@@ -1972,4 +1972,17 @@ Migration 012 is **FROZEN** as Foundation Hardening / Gate 1. See
 012 semantics cannot be patched in place; further changes require a new
 additive migration. 013 must not redesign 012 primitives.
 
+2026-08-22 compatibility amendment: the project owner explicitly authorized
+version-gated PostgreSQL 16+ installer branches in 012 and 013 solely to
+preserve the frozen executor membership capabilities under the newer
+automatic `CREATEROLE` grant model. PostgreSQL 15 behavior and all persisted
+012/013 semantics remain unchanged. This amendment does not reopen the design
+contract.
+
+The same bounded compatibility review converged hosted Supabase's
+`postgres/public` default function grants: 012 removes inherited
+`authenticated` execution from the frozen function surface and restores only
+the two ownership helpers, while 013 explicitly removes external execution
+from six trigger-only guards. Platform default ACLs are not modified.
+
 MIGRATION 012 FROZEN — READY FOR 013 ELIGIBILITY V0.2

@@ -1,6 +1,6 @@
 # Phase 1/2 Foundation Hardening — FROZEN (Migration 012 / Gate 1)
 
-Status: **FROZEN**  
+Status: **FROZEN — PG16+ INSTALL / HOSTED ACL AMENDMENTS RECORDED**  
 Migration: **`202608200012_frozen_foundation_critical_hardening.sql`**  
 Milestone: **Foundation Hardening / Gate 1**  
 Upstream: **migrations `001`–`011`**  
@@ -15,15 +15,40 @@ migration `012`. It does not freeze Eligibility v0.2, Phase 3 overall, or the
 Fit engine. Migrations `001`–`011` remain unchanged historical artifacts.
 Migration `012` must not be edited, reordered, squashed, or patched in place.
 
+On 2026-08-22 the project owner explicitly authorized one bounded exception:
+an installer-only PostgreSQL 16+ compatibility branch for the executor-role
+membership grant. PostgreSQL 15 and superuser installs retain the original
+`WITH ADMIN OPTION` path. A PostgreSQL 16+ non-superuser `CREATEROLE` install
+retains the automatic bootstrap-superuser `ADMIN` membership and adds only the
+`SET`/`INHERIT` membership required for ownership transfer. This amendment
+does not change any persisted product meaning, runtime role attribute, RLS
+policy, function authority, or Eligibility/Fit semantic.
+
+The same authorization cycle later recorded a second bounded installer
+convergence: hosted Supabase gives `authenticated` direct `EXECUTE` on new
+`postgres/public` functions through platform default ACLs. Migration 012 now
+includes `authenticated` in its existing public/private all-function revoke,
+then restores only `current_user_owns_student(uuid)` and
+`current_user_owns_profile(uuid)`. The platform default ACL itself is not
+modified.
+
 The authoritative sources for this freeze are:
 
 1. [`PHASE_1_2_FOUNDATION_REMEDIATION_PLAN.md`](PHASE_1_2_FOUNDATION_REMEDIATION_PLAN.md),
    the 012-owned design contract (sections 9A and 18);
 2. `supabase/migrations/202608200012_frozen_foundation_critical_hardening.sql`,
-   the frozen executable hardening; and
+   the frozen executable hardening
+   (`sha256:e4dc07717c3cb2e0d809c9ce5224d43f40639ed03ca9999638b87843f5a839f7`;
+   role-only intermediate
+   `sha256:5af0301dfee5598a3d453fa5dbef5f041aa681e78c6eb20d433d5545f7f782c9`;
+   original
+   `sha256:ffe25a764747c8d162481d640ec1a47cf35ca7d11b5244b9b1e41f606c1460f9`);
+   and
 3. `supabase/tests/004_phase012_foundation_hardening.sql`, the 012 regression
-   and adversarial suite, together with the accepted Phase 1/2/3 SQL and
-   eligibility-engine baseline recorded below.
+   and adversarial suite
+   (`sha256:a8eab56e8f778405973f9d6ad991518d737857ceada327a5788549ebfcc2b74d`),
+   together with the accepted Phase 1/2/3 SQL and eligibility-engine baseline
+   recorded below.
 
 ## 1. Frozen guarantees
 
@@ -95,6 +120,14 @@ The established freeze-acceptance results are:
 - LEGACY_UNASSERTED re-bind probe: **REJECTED as required**
 - migrations 001–011: **unchanged**
 - no 013/014 objects
+- PostgreSQL 15.19 full migrations/tests 001–017: **PASS**
+- PostgreSQL 17.11 full migrations/tests 001–017: **PASS**
+- PostgreSQL 17 non-superuser `CREATEROLE` 012 install: **PASS**
+- executor effective `ADMIN` / `INHERIT` / `SET` after 012: **PASS**
+- hosted Supabase `postgres/public` default-function ACL simulation through
+  migrations/tests 001–017: **PASS**
+- hosted `authenticated` function convergence without changing platform
+  default ACL: **PASS**
 
 ## 5. Known non-blocking cautions
 
@@ -114,6 +147,11 @@ It does not invalidate this freeze and does not authorize rewriting 012.
 
 012 semantics cannot be patched in place. Further changes require a new
 additive migration.
+
+The 2026-08-22 PostgreSQL 16+ installer branch and hosted `authenticated`
+function-permission convergence recorded above are the sole authorized
+compatibility exceptions to this rule. They preserve PostgreSQL 15 behavior
+and are not authority for further in-place changes.
 
 The following may proceed without a new migration only when they do not alter
 persisted meaning or enforcement:

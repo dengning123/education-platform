@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/test/*.test.js"
+    "generate:v02": "node scripts/generate-v02-registry.mjs",
+    "generate:v02:check": "node scripts/generate-v02-registry.mjs --check",
+    "test": "npm run generate:v02 && npm run generate:v02:check && npm run build && node --test dist/test/*.test.js dist/test/v02/*.test.js"
   },
   "devDependencies": {
     "@types/node": "latest",

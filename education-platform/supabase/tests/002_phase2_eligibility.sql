@@ -33,6 +33,7 @@ declare
   v_first_fingerprint text;
   v_second_fingerprint text;
   v_third_fingerprint text;
+  v_snapshot_hash text;
   v_actual integer;
   v_blocked boolean;
 begin
@@ -112,8 +113,12 @@ begin
       'test-model',
       v_evidence_id
     );
-  exception when check_violation then
-    v_blocked := true;
+  exception when sqlstate '55000' then
+    if sqlerrm like '%cannot be inserted%' then
+      v_blocked := true;
+    else
+      raise;
+    end if;
   end;
   if not v_blocked then
     raise exception 'A model mapping self-verified without reviewer authority';
@@ -140,8 +145,12 @@ begin
       'reviewer-without-evidence',
       now()
     );
-  exception when check_violation then
-    v_blocked := true;
+  exception when sqlstate '55000' then
+    if sqlerrm like '%cannot be inserted%' then
+      v_blocked := true;
+    else
+      raise;
+    end if;
   end;
   if not v_blocked then
     raise exception 'A verified mapping was accepted without evidence';
@@ -242,12 +251,12 @@ begin
     raise exception 'Rule verification accepted an unreviewed mapping';
   end if;
 
-  update public.catalog_concept_mappings
-  set mapping_status = 'VERIFIED',
-      reviewed_by = 'phase2-test-reviewer',
-      reviewed_at = now(),
-      verification_evidence_id = v_evidence_id
-  where mapping_id = v_catalog_mapping_id;
+  perform public.review_catalog_concept_mapping(
+    v_catalog_mapping_id,
+    'VERIFIED',
+    'phase2-test-reviewer',
+    v_evidence_id
+  );
 
   v_blocked := false;
   begin
@@ -558,11 +567,7 @@ begin
 
   v_blocked := false;
   begin
-    update public.student_profile_versions
-    set status = 'FROZEN',
-        snapshot_hash = repeat('d', 64),
-        frozen_at = now()
-    where profile_version_id = v_other_profile_id;
+    perform public.freeze_student_profile_version(v_other_profile_id);
   exception when others then
     if sqlerrm like '%education context requires explicit completeness%' then
       v_blocked := true;
@@ -582,11 +587,7 @@ begin
   ) values
     (v_other_profile_id, v_other_degree_id, 'COURSE_HISTORY', 'COMPLETE'),
     (v_other_profile_id, v_other_degree_id, 'COURSE_MAPPING', 'COMPLETE');
-  update public.student_profile_versions
-  set status = 'FROZEN',
-      snapshot_hash = repeat('d', 64),
-      frozen_at = now()
-  where profile_version_id = v_other_profile_id;
+  perform public.freeze_student_profile_version(v_other_profile_id);
 
   insert into public.student_courses (
     profile_version_id,
@@ -639,8 +640,12 @@ begin
       'human-reviewer',
       now()
     );
-  exception when check_violation then
-    v_blocked := true;
+  exception when sqlstate '55000' then
+    if sqlerrm like '%cannot be inserted%' then
+      v_blocked := true;
+    else
+      raise;
+    end if;
   end;
   if not v_blocked then
     raise exception 'Student mapping became VERIFIED without evidence';
@@ -655,22 +660,21 @@ begin
     method,
     confidence,
     model_version,
-    reviewed_by,
-    reviewed_at,
     student_evidence_id
   ) values (
     v_profile_id,
     'COURSE',
     v_course_id,
     v_course_concept_id,
-    'VERIFIED',
+    'PROPOSED',
     'MODEL',
     0,
     'test-model',
-    'human-reviewer',
-    now(),
     v_student_evidence_id
   ) returning student_mapping_id into v_student_mapping_id;
+  perform public.review_student_record_concept_mapping(
+    v_student_mapping_id, 'VERIFIED', 'human-reviewer', v_student_evidence_id
+  );
 
   insert into public.student_record_concept_mappings (
     profile_version_id,
@@ -680,21 +684,20 @@ begin
     mapping_status,
     method,
     confidence,
-    reviewed_by,
-    reviewed_at,
     student_evidence_id
   ) values (
     v_profile_id,
     'COURSE',
     v_second_course_id,
     v_course_concept_id,
-    'VERIFIED',
+    'PROPOSED',
     'HUMAN',
     0,
-    'human-reviewer',
-    now(),
     v_student_evidence_id
   ) returning student_mapping_id into v_second_student_mapping_id;
+  perform public.review_student_record_concept_mapping(
+    v_second_student_mapping_id, 'VERIFIED', 'human-reviewer', v_student_evidence_id
+  );
 
   insert into public.student_data_completeness (
     profile_version_id,
@@ -705,10 +708,9 @@ begin
   select v_profile_id, null, domain, 'COMPLETE'
   from unnest(enum_range(null::public.student_data_domain)) as value(domain);
 
-  update public.student_profile_versions
-  set status = 'FROZEN',
-      snapshot_hash = repeat('b', 64),
-      frozen_at = now()
+  perform public.freeze_student_profile_version(v_profile_id);
+  select snapshot_hash into v_snapshot_hash
+  from public.student_profile_versions
   where profile_version_id = v_profile_id;
 
   select rule_node_id into v_root_id
@@ -735,7 +737,7 @@ begin
     '0.1.0',
     repeat('c', 64),
     'eligibility-v0.1',
-    repeat('b', 64)
+    v_snapshot_hash
   ) returning evaluation_id into v_evaluation_id;
 
   insert into public.eligibility_manifest_courses
@@ -799,6 +801,7 @@ begin
     v_student_evidence_id
   );
 
+  perform public.seal_eligibility_evaluation_inputs(v_evaluation_id);
   v_first_fingerprint := public.finalize_eligibility_evaluation(
     v_evaluation_id,
     'ELIGIBLE'
@@ -840,7 +843,7 @@ begin
     '0.1.0',
     repeat('c', 64),
     'eligibility-v0.1',
-    repeat('b', 64)
+    v_snapshot_hash
   ) returning evaluation_id into v_second_evaluation_id;
   insert into public.eligibility_manifest_courses
   values (v_second_evaluation_id, v_profile_id, v_second_course_id);
@@ -905,6 +908,7 @@ begin
     v_second_course_id,
     v_student_evidence_id
   );
+  perform public.seal_eligibility_evaluation_inputs(v_second_evaluation_id);
   v_second_fingerprint := public.finalize_eligibility_evaluation(
     v_second_evaluation_id,
     'ELIGIBLE'
@@ -930,7 +934,7 @@ begin
     '0.1.0',
     repeat('c', 64),
     'eligibility-v0.1',
-    repeat('b', 64)
+    v_snapshot_hash
   ) returning evaluation_id into v_third_evaluation_id;
   insert into public.eligibility_manifest_taxonomy_concepts
   values (v_third_evaluation_id, v_course_concept_id);
@@ -990,6 +994,7 @@ begin
     v_course_id,
     v_student_evidence_id
   );
+  perform public.seal_eligibility_evaluation_inputs(v_third_evaluation_id);
   v_third_fingerprint := public.finalize_eligibility_evaluation(
     v_third_evaluation_id,
     'ELIGIBLE'
@@ -998,11 +1003,10 @@ begin
     raise exception 'Manifest insertion order changed the canonical fingerprint';
   end if;
 
-  update public.catalog_concept_mappings
-  set mapping_status = 'RETIRED',
-      retired_at = now(),
-      retirement_reason = 'Superseded equivalency interpretation'
-  where mapping_id = v_catalog_mapping_id;
+  perform public.retire_catalog_concept_mapping(
+    v_catalog_mapping_id,
+    'Superseded equivalency interpretation'
+  );
   select count(*) into v_actual
   from public.eligibility_evaluations
   where profile_version_id = v_profile_id
@@ -1097,7 +1101,7 @@ begin
       '0.1.0',
       repeat('c', 64),
       'eligibility-v0.1',
-      repeat('b', 64)
+      v_snapshot_hash
     );
   exception when others then
     if sqlerrm like '%stale sources or mappings%' then
@@ -1169,7 +1173,9 @@ begin
   end if;
   select count(*) into v_actual
   from public.student_deletion_tombstones
-  where deletion_reason = 'Phase 2 privacy lifecycle test';
+  where reason_code = 'TEST_LIFECYCLE'
+    and request_class = 'TEST'
+    and legacy_deletion_reason = 'MIGRATED_TO_REASON_CODE';
   if v_actual <> 1 then
     raise exception 'Minimal non-PII deletion tombstone was not created';
   end if;

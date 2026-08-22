@@ -132,3 +132,50 @@ mathematical preparation are not treated as admissions requirements.
    canonical typed value.
 5. For a new admissions cycle, create a new `program_versions` row and attach
    new admissions, deadline, cost, course, and evidence records.
+
+## Phase 3 Fit persistence
+
+Fit v0.1 is an additive derived layer. It does not rewrite Phase 1 program
+facts or Phase 2 student/eligibility records.
+
+- `fit_contract_releases`, `fit_dimension_methods`, and
+  `fit_evaluator_builds` pin the approved semantic and execution identities.
+- `fit_semantic_source_classes` is the one source-class identity registry;
+  method policies authorize allowed classes and retain prohibited classes
+  explicitly.
+- Mapping-relation policies and registered signal types govern mapping
+  semantics and signal materiality rather than trusting caller assertions.
+- `fit_intent_sets` store frozen Phase 3 interpretations of Phase 2 goals and
+  preferences (importance is Fit-specific; Phase 2 `priority` is not mapped).
+  REQUIRED importance needs student-authorized evidence, and contradictory
+  REQUIRED declarations cannot freeze.
+- `fit_context_claims` hold reviewed contextual facts Phase 1 cannot represent;
+  append-only selection history preserves evaluation-time context.
+- `fit_evaluations` pin a frozen profile, frozen intent set, program version,
+  taxonomy release, contract, exact six methods, and approved evaluator build.
+  An optional eligibility evaluation is display-only and excluded from the
+  decision fingerprint.
+- Every completed evaluation persists exactly six `fit_dimension_results`.
+- Candidate execution seals an order-independent SHA-256 input fingerprint.
+  `finalize_fit_evaluation()` rechecks it, validates categorical semantics,
+  and writes separate canonical decision-input and structured-result
+  fingerprints.
+- UNKNOWN families remain normalized through
+  `fit_dimension_reasons -> fit_reason_definitions.reason_family`; they are not
+  copied onto results.
+
+Student-owned Fit artifacts cascade on privacy deletion. Public contextual
+claims survive. Migration `016` registers one reviewed Fit v0.1 evaluator build
+and two service-only, bounded snapshot functions without widening runtime table
+privileges. Migration `017` adds a closed Financial normalization lifecycle:
+the student-owned request starts an unsealed evaluation and pins its canonical
+amount/billing-basis source; a separately authorized reviewer moves the
+normalization from `DRAFT` to `VERIFIED`; resume reuses that exact evaluation
+and persists the normalization, both source witnesses, and any required
+`AVAILABLE_FUNDING` declaration on one Financial signal. The calculation
+contract is versioned as `FIT_FINANCIAL_NORMALIZATION_CALC_V017`, uses exact
+decimal annualization (and optional funding subtraction), permits only
+no-rounding same-currency conversions, and leaves frozen migrations `014` and
+`015` unchanged. Migrations `001`–`018` and all four authenticated Edge
+Functions are remotely deployed and behavior-verified. Phase 3 Fit v0.1 is
+finally frozen by [`PHASE_3_FREEZE.md`](PHASE_3_FREEZE.md).

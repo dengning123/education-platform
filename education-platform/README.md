@@ -22,28 +22,97 @@ supabase db reset
 
 The golden record is a data migration, so `db reset` installs both the schema
 and its verified data. `supabase/config.toml` deliberately disables a separate
-seed file.
+seed file. The active migration directory contains migrations `001`–`018`.
+Migration `015` remains frozen; additive Migration `016` registers the reviewed
+Fit Engine v0.1 build and its service-only source projections, and Migration
+`017` adds the independently reviewed Financial normalization workflow.
 
-To validate with any PostgreSQL 15 database:
+The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
+executor membership grant path; PostgreSQL 16+ uses the authorized
+non-superuser `CREATEROLE` compatibility branch while preserving the same
+effective `ADMIN` / `INHERIT` / `SET` capabilities. On a fresh PostgreSQL 15
+or 17 database, first validate the `001`–`013` baseline and then apply/test
+`014`:
+
+Hosted Supabase's `postgres/public` default function ACL is also supported:
+012 converges `authenticated` to the two ownership helpers, and 013 removes
+external execution from its trigger-only guards without modifying the
+platform default ACL.
 
 ```bash
-for migration in supabase/migrations/*.sql; do
+for migration in supabase/migrations/2026082000{01..13}_*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
 done
+for test_file in \
+  supabase/tests/001_education_foundation.sql \
+  supabase/tests/002_phase2_eligibility.sql \
+  supabase/tests/003_phase3_fit.sql \
+  supabase/tests/004_phase012_foundation_hardening.sql \
+  supabase/tests/005_phase013_eligibility_v02.sql
+do
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$test_file"
+done
+
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f supabase/tests/001_education_foundation.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f supabase/tests/002_phase2_eligibility.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f supabase/tests/003_phase3_fit.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f supabase/tests/004_phase012_foundation_hardening.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f supabase/tests/005_phase013_eligibility_v02.sql
+  -f supabase/migrations/202608200014_financial_billing_basis_hardening.sql
+for test_file in \
+  supabase/tests/001_education_foundation.sql \
+  supabase/tests/002_phase2_eligibility.sql \
+  supabase/tests/006_phase014_financial_billing_basis_hardening.sql
+do
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$test_file"
+done
 ```
 
-The SQL tests run inside transactions and roll back their fixtures. They exit
-nonzero on any failed assertion.
+After the 014 suite passes, apply and validate 015, then register and validate
+the Fit v0.1 production build with 016:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/202608200015_fit_replay_and_seal_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/007_phase015_fit_replay_and_seal_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/202608220016_fit_engine_v01_production_registration.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/008_phase016_fit_engine_production_registration.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/202608220017_fit_financial_normalization_workflow.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/009_phase017_fit_financial_normalization_workflow.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/202608220018_fit_v014_private_function_acl_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/010_phase018_fit_v014_private_function_acl_hardening.sql
+```
+
+Tests `003`, `004`, and `005` are frozen baseline tests and intentionally run
+before `014`; `004` and `005` reject leaked `014` objects, while new Financial
+assemblies at the `014` head require the v014 witness contract covered by
+`006`. The normal SQL tests run inside transactions and roll back their
+fixtures. They exit nonzero on any failed assertion.
+
+The concurrency probe is for a disposable database only because its fixture
+mode commits rows:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v phase014_commit_fixture=1 \
+  -f supabase/tests/006_phase014_financial_billing_basis_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/_phase014_concurrency_probe.sql
+```
+
+For the 015 behavior and concurrency gates, start from the 014 boundary, run
+the committed 006 fixture, apply 015, then run:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v phase015_behavior_fixture=1 \
+  -f supabase/tests/007_phase015_fit_replay_and_seal_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/_phase015_concurrency_probe.sql
+```
 
 To typecheck and test the pure eligibility library:
 
@@ -52,6 +121,41 @@ cd packages/eligibility-engine
 npm ci
 npm test
 ```
+
+To typecheck and test the pure categorical Fit library:
+
+```bash
+cd packages/fit-engine
+pnpm install --frozen-lockfile
+pnpm test
+```
+
+To build and test the production Fit adapter and Edge artifact:
+
+```bash
+cd packages/fit-engine-adapter
+pnpm install --frozen-lockfile
+pnpm test
+pnpm bundle:edge
+```
+
+The authenticated Financial normalization API is deliberately three-stage:
+
+1. `fit-normalization-prepare` starts one `BUILDING` evaluation, pins the
+   amount and `billing_basis`, and creates typed conversion inputs/factors plus
+   a `DRAFT` normalization.
+2. `fit-normalization-review` requires a different signed-in user whose JWT
+   `app_metadata.fit_normalization_reviewer` is `true`; student self-review and
+   reuse of conversion evidence as review evidence are rejected.
+3. `fit-normalization-resume` reuses the same evaluation after `VERIFIED`
+   review, performs versioned exact-decimal same-currency arithmetic, persists
+   exact signal provenance, seals fingerprints, and finalizes.
+
+Migration `017` authorizes only `ANNUAL_TO_PROGRAM` and
+`ANNUAL_TO_NET_PROGRAM` version 1. Both use the
+`FIT_FINANCIAL_NORMALIZATION_CALC_V017` calculation contract, require
+`rounding=NONE`, and do not authorize currency conversion. The net method
+requires one separate frozen `AVAILABLE_FUNDING` intent on the same signal.
 
 ## Migration order
 
@@ -89,6 +193,29 @@ npm test
     sealed replay, projections/`ABSENT`, taxonomy ordinals, and v0.1
     coexistence. Frozen; see
     [docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md](docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md).
+14. `202608200014_financial_billing_basis_hardening.sql` — Financial
+    `billing_basis` authority, typed normalization inputs/factors, strict
+    funding isolation, v014 fingerprints, fail-closed finalization, and
+    concurrency-safe lifecycle enforcement. Frozen; see
+    [docs/PHASE_3_FINANCIAL_BILLING_BASIS_HARDENING_FREEZE.md](docs/PHASE_3_FINANCIAL_BILLING_BASIS_HARDENING_FREEZE.md).
+15. `202608200015_fit_replay_and_seal_hardening.sql` — seal-time semantic
+    pinning, pin-only deterministic finalization, legacy 014 dispatch,
+    concurrency-safe replay, and privacy-cascade closure. Frozen; see
+    [docs/PHASE_3_FIT_REPLAY_AND_SEAL_HARDENING_FREEZE.md](docs/PHASE_3_FIT_REPLAY_AND_SEAL_HARDENING_FREEZE.md).
+16. `202608220016_fit_engine_v01_production_registration.sql` — reviewed Fit
+    Engine v0.1 evaluator-build registration and service-only bounded snapshot
+    functions. It is included in the final Phase 3 v0.1 freeze; see
+    [docs/PHASE_3_FREEZE.md](docs/PHASE_3_FREEZE.md).
+17. `202608220017_fit_financial_normalization_workflow.sql` — closed production
+    annual-to-program and annual-to-net-program methods, service-only DRAFT
+    assembly, independent authenticated review, bounded same-evaluation resume
+    snapshots, exact-decimal calculation versioning, and least-privilege
+    owner/grant boundaries. This is additive and does not modify frozen
+    migrations `014` or `015`.
+18. `202608220018_fit_v014_private_function_acl_hardening.sql` — ACL-only
+    correction that removes implicit external EXECUTE from exactly 13 v014
+    private helper/guard functions while retaining the evaluator owner and the
+    hosted platform default ACL. It changes no v014–v017 business semantics.
 
 ## Rules for data changes
 
@@ -121,11 +248,15 @@ persist that contract (registries, intent snapshots, contextual claims, exact
 decision manifests, six dimension results, execution integrity, finalization,
 RLS, and privacy deletion) and are frozen by
 [docs/PHASE_3_DATABASE_FREEZE.md](docs/PHASE_3_DATABASE_FREEZE.md). The
-design-only engine milestone is
-[docs/PHASE_3_FIT_ENGINE_PLAN.md](docs/PHASE_3_FIT_ENGINE_PLAN.md). Phase 3
-overall is **not frozen**, and there is no final Phase 3 tag: no production
-evaluator build is registered and there is no Fit TypeScript evaluator, API,
-score, ranking, probability, or recommendation implementation.
+engine implementation contract is
+[docs/PHASE_3_FIT_ENGINE_PLAN.md](docs/PHASE_3_FIT_ENGINE_PLAN.md). Phase 3 Fit
+v0.1 is **FROZEN** by
+[docs/PHASE_3_FREEZE.md](docs/PHASE_3_FREEZE.md). The frozen release includes
+the pure categorical evaluator, controlled adapter, registered evaluator
+build, authenticated evaluation endpoint, and separate Financial
+prepare/review/resume endpoints. It does not implement a score, weight,
+ranking, probability, recommendation, Eligibility interpretation, or
+Competitiveness model.
 
 Migration `012` Foundation Hardening / Gate 1 is **FROZEN**; its
 change-control record is
@@ -135,4 +266,20 @@ change-control record is
 [docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md](docs/PHASE_2_ELIGIBILITY_V02_FREEZE.md).
 The implementation contract remains
 [docs/PHASE_2_ELIGIBILITY_V02_PLAN.md](docs/PHASE_2_ELIGIBILITY_V02_PLAN.md).
-This freeze does not authorize Migration 014 or Fit Engine implementation.
+Migration 014 — Financial Billing Basis Hardening is **FROZEN**; its
+change-control record is
+[docs/PHASE_3_FINANCIAL_BILLING_BASIS_HARDENING_FREEZE.md](docs/PHASE_3_FINANCIAL_BILLING_BASIS_HARDENING_FREEZE.md).
+Migration 015 — Fit Replay and Seal Hardening is **FROZEN**; its
+change-control record is
+[docs/PHASE_3_FIT_REPLAY_AND_SEAL_HARDENING_FREEZE.md](docs/PHASE_3_FIT_REPLAY_AND_SEAL_HARDENING_FREEZE.md).
+Its authorized hosted-runner amendment preserves replay/seal semantics while
+restoring the captured installer role after the executor-scoped adoption
+update; the freeze record contains the current hash and dual-role regression.
+Fit Engine v0.1 production implementation is locally and remotely verified.
+Remote migrations `001`–`018` and all four JWT-protected Edge Functions are
+deployed; authenticated `evaluate` and independently reviewed
+`prepare → review → resume` smoke passed, and temporary users/data were
+cleaned up. The release evidence is recorded in
+[docs/PHASE_3_PRODUCTION_RELEASE_CANDIDATE.md](docs/PHASE_3_PRODUCTION_RELEASE_CANDIDATE.md),
+and the authoritative final state is
+[docs/PHASE_3_FREEZE.md](docs/PHASE_3_FREEZE.md).

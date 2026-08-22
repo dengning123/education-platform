@@ -13,3 +13,6 @@ charts/
 .ipynb_checkpoints/
 node_modules/
 dist/
+education-platform/exports/
+education-platform/supabase/.branches/
+education-platform/supabase/.temp/

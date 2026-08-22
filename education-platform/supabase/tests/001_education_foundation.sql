@@ -4,6 +4,9 @@ do $test$
 declare
   actual integer;
   blocked boolean;
+  v_scope uuid;
+  v_obs uuid;
+  v_assertion uuid;
 begin
   select count(*) into actual from public.universities;
   if actual <> 1 then
@@ -283,6 +286,24 @@ begin
     'Test-only unresolved conflict.'
   );
 
+  v_scope := public.create_evidence_scope(
+    '00000000-0000-0000-0000-000000000702',
+    'PROGRAM',
+    '00000000-0000-0000-0000-000000000301',
+    'cip_code',
+    'UNSPECIFIED',
+    'UNSPECIFIED',
+    'UNSPECIFIED'
+  );
+  perform public.review_evidence_applicability(
+    v_scope, 'REVIEWED_APPLICABLE', 'test-suite', 'test applicability'
+  );
+  insert into public.field_observation_applicability (observation_id, assertion_id)
+  values (
+    'ffffffff-ffff-ffff-ffff-fffffffffff2',
+    (select h.assertion_id from public.evidence_applicability_heads h
+     where h.scope_id = v_scope)
+  );
   perform public.select_field_observation(
     'ffffffff-ffff-ffff-ffff-fffffffffff2',
     'test-suite'
@@ -302,8 +323,20 @@ begin
     raise exception 'SOURCE_CONFLICT did not become the selected canonical state';
   end if;
 
+  v_obs := public.create_field_observation(
+    'PROGRAM',
+    '00000000-0000-0000-0000-000000000301',
+    'cip_code',
+    to_jsonb('45.0603'::text),
+    'KNOWN',
+    '00000000-0000-0000-0000-000000000702',
+    null,
+    'Test-only restored KNOWN CIP after SOURCE_CONFLICT.',
+    (select h.assertion_id from public.evidence_applicability_heads h
+     where h.scope_id = v_scope)
+  );
   perform public.accept_field_observation(
-    md5('00000000-0000-0000-0000-000000000301:cip_code')::uuid,
+    v_obs,
     'test-suite'
   );
   if (select cip_code from public.programs
@@ -568,12 +601,31 @@ where version.program_version_id = '00000000-0000-0000-0000-000000000499'
 do $test$
 declare
   observation record;
+  v_scope uuid;
 begin
   for observation in
-    select observation_id
+    select *
     from public.field_observations
     where record_id = '00000000-0000-0000-0000-000000000499'
   loop
+    v_scope := public.create_evidence_scope(
+      observation.evidence_id,
+      observation.record_type,
+      observation.record_id,
+      observation.field_name,
+      'UNSPECIFIED',
+      'UNSPECIFIED',
+      'UNSPECIFIED'
+    );
+    perform public.review_evidence_applicability(
+      v_scope, 'REVIEWED_APPLICABLE', 'test-suite', 'test applicability'
+    );
+    insert into public.field_observation_applicability (observation_id, assertion_id)
+    values (
+      observation.observation_id,
+      (select h.assertion_id from public.evidence_applicability_heads h
+       where h.scope_id = v_scope)
+    );
     perform public.accept_field_observation(observation.observation_id, 'test-suite');
   end loop;
 end;

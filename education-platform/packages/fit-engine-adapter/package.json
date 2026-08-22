@@ -1,0 +1,22 @@
+{
+  "name": "@education-platform/fit-engine-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "bundle:edge": "pnpm --dir ../fit-engine build && esbuild src/index.ts --bundle --platform=neutral --format=esm --target=es2022 --outfile=../../supabase/functions/_shared/fit-runtime.js",
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
+    "test:integration:local": "node test/local-api.integration.mjs"
+  },
+  "dependencies": {
+    "@education-platform/fit-engine": "link:../fit-engine"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "esbuild": "latest",
+    "typescript": "latest"
+  }
+}

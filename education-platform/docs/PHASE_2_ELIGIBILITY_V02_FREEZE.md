@@ -1,6 +1,6 @@
 # Phase 2 Eligibility Correctness v0.2 — FROZEN (Migration 013)
 
-Status: **FROZEN**  
+Status: **FROZEN — PG16+ INSTALL / HOSTED ACL AMENDMENTS RECORDED**  
 Migration: **`202608200013_eligibility_correctness_v02.sql`**  
 Milestone: **Eligibility Correctness v0.2**  
 Upstream freeze: **Migration 012 Foundation Hardening / Gate 1**  
@@ -16,16 +16,35 @@ production-release claim. Migrations `001`–`012` remain unchanged
 historical artifacts. Migration `013` must not be edited, reordered,
 squashed, or patched in place.
 
+On 2026-08-22 the project owner explicitly authorized one bounded exception:
+the 013 preflight now mirrors 012's PostgreSQL 16+ installer-only membership
+branch. It avoids repeating a prohibited self-`ADMIN` grant while preserving
+effective `ADMIN`, `SET`, and `INHERIT`. PostgreSQL 15 and superuser installs
+retain the original path. Eligibility v0.2 data, projection, fingerprint,
+finalization, replay, and authorization semantics are unchanged.
+
+The hosted-default-ACL regression also proved that six 013 `RETURNS trigger`
+guards inherited direct external `EXECUTE`. The project owner authorized
+explicit revocation from `PUBLIC`, `anon`, `authenticated`, `service_role`,
+and `authenticator`. These functions remain trigger-only; no callable API or
+Eligibility behavior changed, and the platform default ACL is untouched.
+
 The authoritative sources for this freeze are:
 
 1. [`PHASE_2_ELIGIBILITY_V02_PLAN.md`](PHASE_2_ELIGIBILITY_V02_PLAN.md),
    the 013 design contract;
 2. `supabase/migrations/202608200013_eligibility_correctness_v02.sql`,
    the frozen executable migration
-   (`sha256:6830d17131ad86d3f5c42edb39883e46def5a2f39e79b8af488b5fd60798332b`);
+   (`sha256:65f231e376246191f54a6f8e5a7b8d01810746b3c47e7ecef22f93f84d4a0f58`;
+   role-only intermediate
+   `sha256:102385d8cf6b0b41b0e3f1e0059006dc5f3f99735db691a011139e707744e6f3`;
+   original
+   `sha256:6830d17131ad86d3f5c42edb39883e46def5a2f39e79b8af488b5fd60798332b`);
 3. `supabase/tests/005_phase013_eligibility_v02.sql`, the 013 regression
-   and adversarial suite, together with the accepted Phase 1/2/3/012 SQL
-   and eligibility-engine baseline recorded below.
+   and adversarial suite
+   (`sha256:f202661df4d1cb53344021a8e3dcf03d6193da841a17e95b58be71711b8554b4`),
+   together with the accepted Phase 1/2/3/012 SQL and eligibility-engine
+   baseline recorded below.
 
 At freeze time the 013 SQL, 005 tests, v0.2 engine, and plan remain
 working-tree artifacts (same docs-only freeze pattern as migration
@@ -297,6 +316,11 @@ rewriting 013.
 
 013 semantics cannot be patched in place. Further changes require a new
 additive migration.
+
+The 2026-08-22 PostgreSQL 16+ preflight branch and six trigger-only hosted ACL
+revocations recorded above are the sole authorized compatibility exceptions
+to this rule. They preserve PostgreSQL 15 behavior and all Eligibility v0.2
+semantics and are not authority for further in-place changes.
 
 The following may proceed without a new migration only when they do not
 alter persisted meaning or enforcement:

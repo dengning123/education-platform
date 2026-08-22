@@ -31,12 +31,17 @@ database/persistence layer frozen separately in migrations `009`–`011`
 ([`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md)),
 and Migration `013` Eligibility Correctness v0.2
 ([`PHASE_2_ELIGIBILITY_V02_FREEZE.md`](PHASE_2_ELIGIBILITY_V02_FREEZE.md)).
-The design-only engine milestone is [`PHASE_3_FIT_ENGINE_PLAN.md`](PHASE_3_FIT_ENGINE_PLAN.md).
-Phase 3 overall remains unfrozen and has no final tag. Its TypeScript
-evaluator, API, score, ranking, recommendation, Competitiveness, and Admission
-Probability are not implemented or authorized. This freeze does not authorize
-Migration 014 or Fit Engine implementation. The principles below define
-migration direction without authorizing speculative tables or services.
+Migrations `014` and `015` are separately frozen by their Phase 3 hardening
+records. The authorized engine implementation contract is
+[`PHASE_3_FIT_ENGINE_PLAN.md`](PHASE_3_FIT_ENGINE_PLAN.md).
+Phase 3 Fit v0.1 is frozen by
+[`PHASE_3_FREEZE.md`](PHASE_3_FREEZE.md). The production release contains the
+Fit Engine v0.1 TypeScript evaluator, controlled persistence adapter,
+registered evaluator build, authenticated Edge APIs, and independently
+reviewed Financial normalization workflow. Migrations `001`–`018` and all four
+Edge Functions are remotely deployed and behavior-verified. Scores, weights,
+rankings, recommendations, Competitiveness, and Admission Probability remain
+outside the Fit contract and are not implemented.
 
 ## 1. Raw data and derived data
 
@@ -161,6 +166,31 @@ Fit is not an admission probability. Admission probabilities must not be
 implemented without sufficient validated outcomes and an appropriate
 statistical methodology.
 
+### Future Competitiveness modeling direction (not authorized)
+
+A future, separately approved Competitiveness or admission-outcome phase may
+estimate feature effects from historical application snapshots and verified
+outcomes. This statistical learning belongs only to Competitiveness: it must
+not replace Eligibility's explicit rule logic or Fit's categorical
+preference-and-constraint semantics.
+
+Any learned effects or weights are versioned model outputs, not fixed student
+attributes or canonical source facts. The model must retain the exact model
+version and input snapshot used for each result and should account for
+uncertainty, calibration, program effects, admissions-cycle effects, and
+relevant interactions or nonlinearities. When outcome data for an individual
+program is sparse, the preferred direction is a hierarchical or
+partial-pooling approach that can borrow appropriately scoped information
+from related program families while allowing program-specific evidence to
+dominate as it grows.
+
+Historical outcomes are therefore candidates for future model improvement,
+not authorization to assign global manual weights or to produce admission
+probabilities now. This note records a research and architecture direction
+only. It does not change any frozen Eligibility or Fit semantic contract and
+does not authorize a Competitiveness model or Admission Probability and does
+not expand the separately authorized categorical Fit Engine scope.
+
 ## 9. Uncertainty is first-class
 
 If a later, explicitly versioned phase introduces numerical scores, outputs
@@ -267,6 +297,8 @@ Completed and frozen:
   see [`PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md`](PHASE_1_2_FOUNDATION_HARDENING_FREEZE.md);
 - Migration `013` Eligibility Correctness v0.2, additive over frozen `012`;
   see [`PHASE_2_ELIGIBILITY_V02_FREEZE.md`](PHASE_2_ELIGIBILITY_V02_FREEZE.md).
+- Migration `014` Financial Billing Basis Hardening and Migration `015` Fit
+  Replay and Seal Hardening, each under its independent freeze record.
 
 Current approved semantic contract:
 
@@ -280,9 +312,13 @@ frozen in migrations `009`–`011` and SQL tests. Migration `012` Foundation
 Hardening is **FROZEN**. Migration 013 — Eligibility Correctness v0.2 is
 **FROZEN**
 ([`PHASE_2_ELIGIBILITY_V02_FREEZE.md`](PHASE_2_ELIGIBILITY_V02_FREEZE.md)).
-The Fit TypeScript evaluator is not implemented;
-Phase 3 overall is not frozen, and there is no final Phase 3 tag. This freeze
-does not authorize Migration 014 or Fit Engine implementation.
+The Fit TypeScript evaluator, controlled adapter, evaluator-build registration,
+evaluation Edge API, and separate Financial normalization
+prepare/review/resume workflow are locally and remotely verified and frozen by
+[`PHASE_3_FREEZE.md`](PHASE_3_FREEZE.md). Financial normalization is limited
+to the versioned, independently reviewed same-currency annualization contracts
+in Migration `017`; unsupported conversion or review states fail closed.
+Ranking, probability, recommendation, and Competitiveness remain unimplemented.
 
 Do not implement the full future architecture now. Add no speculative tables,
 services, matching engines, or model pipelines merely because they appear in
