@@ -206,16 +206,6 @@ test("structured event is allowlisted and excludes headers, payload, and object 
   }
 });
 
-test("deadline failure is closed and bounded", async () => {
-  const { handler } = harness({
-    getEnv: environment({ FIT_EDGE_DEADLINE_MS: "5" }),
-    handler: () => new Promise(() => {}),
-  });
-  const response = await handler(request());
-  assert.equal(response.status, 504);
-  assert.equal((await json(response)).error, "REQUEST_DEADLINE_EXCEEDED");
-});
-
 test("invalid or wildcard deployment configuration fails closed", async () => {
   for (const getEnv of [
     environment({ FIT_EDGE_ALLOWED_ORIGINS: "*" }),

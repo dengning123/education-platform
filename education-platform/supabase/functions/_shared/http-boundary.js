@@ -20,13 +20,11 @@ const PUBLIC_ERROR_CATALOG = new Map([
   ["METHOD_NOT_ALLOWED", 405],
   ["PAYLOAD_TOO_LARGE", 413],
   ["PROFILE_NOT_FOUND", 404],
-  ["REQUEST_DEADLINE_EXCEEDED", 504],
   ["SERVICE_CONFIGURATION_MISSING", 500],
   ["UNSUPPORTED_MEDIA_TYPE", 415],
 ]);
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
-const DEFAULT_DEADLINE_MS = 25_000;
 const CONFIG_VALUE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const STATUS_PATTERN = /^[1-5][0-9][0-9]$/;
 
@@ -121,12 +119,6 @@ export function readEdgeConfiguration(getEnv) {
       DEFAULT_MAX_BODY_BYTES,
       1024,
       1024 * 1024,
-    ),
-    deadlineMs: parseBoundedInteger(
-      getEnv("FIT_EDGE_DEADLINE_MS"),
-      DEFAULT_DEADLINE_MS,
-      1,
-      50_000,
     ),
   });
 }
@@ -252,14 +244,6 @@ function emitEvent(log, event) {
   }));
 }
 
-function deadline(promise, deadlineMs) {
-  let timer;
-  const exceeded = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(edgeHttpError("REQUEST_DEADLINE_EXCEEDED")), deadlineMs);
-  });
-  return Promise.race([promise, exceeded]).finally(() => clearTimeout(timer));
-}
-
 export function createEdgeHttpHandler({
   endpoint,
   internalErrorCode,
@@ -301,10 +285,8 @@ export function createEdgeHttpHandler({
         const authorization = validAuthorization(request);
         if (authorization === null) throw edgeHttpError("AUTHENTICATION_REQUIRED");
 
-        const result = await deadline((async () => {
-          const body = await readBoundedJson(request, configuration.maxBodyBytes);
-          return await handler({ request, body, authorization, requestId });
-        })(), configuration.deadlineMs);
+        const body = await readBoundedJson(request, configuration.maxBodyBytes);
+        const result = await handler({ request, body, authorization, requestId });
         if (
           result === null ||
           typeof result !== "object" ||
