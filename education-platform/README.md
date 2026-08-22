@@ -291,3 +291,5 @@ The proposed Application/Outcome data contract is
 [docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
 No Migration 019 SQL, Application/Outcome runtime, or Competitiveness model is
 implemented or authorized by those documents.
+The independent plan disposition is recorded in
+[docs/PHASE_4_AND_MIGRATION_019_PLAN_REVIEW.md](docs/PHASE_4_AND_MIGRATION_019_PLAN_REVIEW.md).

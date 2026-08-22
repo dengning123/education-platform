@@ -57,7 +57,7 @@ Migration 019 creates new types rather than altering frozen enums:
 
 ```text
 application_lifecycle_state
-  DRAFT | SUBMITTED | WITHDRAWN | DECIDED | CLOSED_NO_DECISION
+  DRAFT | CANCELLED | SUBMITTED | WITHDRAWN | DECIDED | CLOSED_NO_DECISION
 
 application_origin
   STUDENT_ENTERED | PLATFORM_ASSISTED
@@ -102,6 +102,7 @@ One row represents one actual application to one exact program version.
 | `lifecycle_state application_lifecycle_state NOT NULL` | Starts `DRAFT`. |
 | `submission_snapshot_id uuid` | NULL in DRAFT; points to the sealed submission snapshot afterward. |
 | `creation_request_id uuid NOT NULL` | Owner-scoped idempotency key. |
+| `cancellation_request_id uuid` | Present only in CANCELLED; owner-scoped idempotency key. |
 | `created_at/updated_at` | Operational timestamps, excluded from fingerprints. |
 | `submitted_at/closed_at` | State-shape constrained timestamps. |
 
@@ -109,15 +110,19 @@ Required keys and constraints:
 
 - unique `(student_id, application_id)` for child composite FKs;
 - unique `(student_id, creation_request_id)`;
-- unique normalized `(student_id, program_version_id, application_round_code)` so
-  retries cannot create duplicate real applications;
+- unique `(student_id, cancellation_request_id)` when cancellation request is
+  non-NULL;
+- unique normalized `(student_id, program_version_id, application_round_code)`
+  over non-CANCELLED rows so retries cannot create duplicate active/real
+  applications while a cancelled draft does not block a later restart;
 - DRAFT has no snapshot/submission/closure time;
+- CANCELLED has no snapshot/submission time and has a closure time;
 - SUBMITTED has a sealed snapshot and submission time but no closure time;
 - WITHDRAWN, DECIDED, and CLOSED_NO_DECISION have a sealed snapshot,
   submission time, and closure time;
 - round codes match `^[A-Z][A-Z0-9_]{0,63}$` when present;
 - program version and application round code are immutable after submission;
-- direct DELETE is forbidden except the authorized privacy cascade.
+- physical DELETE is forbidden except the authorized privacy cascade.
 
 ### 4.2 `public.application_submission_snapshots`
 
@@ -160,6 +165,10 @@ Submission validation must prove inside one transaction and under locks:
   fingerprints, and its rule set belongs to the same program version;
 - Fit is `COMPLETED`, uses `fit-v0.1`, belongs to the same profile/intent and
   program version, and has all three valid fingerprints;
+- Fit's display-only `eligibility_context_evaluation_id` is either NULL or
+  exactly the Eligibility evaluation pinned by this submission; a different
+  non-NULL context is rejected even though it is excluded from the Fit
+  decision fingerprint;
 - copied hashes and discriminators equal the source rows after locks;
 - the program version is active at submission;
 - no selected object belongs to another student or program.
@@ -304,8 +313,8 @@ Proposed public functions:
 ```text
 create_student_application_v019(...typed arguments...) -> application_id
 update_student_application_draft_v019(...typed arguments...) -> void
+cancel_student_application_draft_v019(application_id, request_id) -> void
 submit_student_application_v019(...pinned IDs..., request_id) -> snapshot result
-withdraw_student_application_v019(application_id, request_id) -> void
 report_application_outcome_v019(...typed arguments...) -> observation_id
 list_application_outcome_review_queue_v019(limit, cursor) -> bounded rows
 get_application_outcome_review_candidate_v019(observation_id) -> bounded row
@@ -326,6 +335,13 @@ Contracts:
   fingerprint, or lifecycle state;
 - review and selection are atomic when VERIFIED;
 - functions emit student lifecycle audit events with typed object/event codes.
+
+Draft cancellation locks the student and application, proves the application
+is still DRAFT and has no dependent semantic row, and transitions it to
+CANCELLED with `cancellation_request_id` and closure time. The retained
+terminal row makes network retry idempotent. Submitted applications can never
+use this path. A submitted application's WITHDRAWN state is reached only from
+a reviewed WITHDRAWN outcome observation, not from a separate lifecycle RPC.
 
 The two reviewer-read functions require the dedicated reviewer claim, enforce
 bounded stable pagination or one exact observation, and return only program
@@ -360,6 +376,15 @@ membership.
 
 Reviewers receive no table-level SELECT. Their only read authority is the two
 bounded claim-gated reviewer RPCs.
+
+Migration installation must reuse the frozen PostgreSQL role-compatibility
+contract established by 012/013/015: PostgreSQL 15 behavior remains unchanged,
+PostgreSQL 16+ membership options are applied only where supported, the
+original installer role is captured and restored without a naked
+`RESET ROLE`, and temporary executor schema `CREATE` is revoked before commit.
+Migration 019 must not modify hosted Supabase platform default ACLs. It revokes
+implicit function EXECUTE on its own functions and proves the resulting exact
+whitelist instead.
 
 Owner-visible review rows expose decision, level, reason code, and time, but
 never the reviewer Auth UUID.
@@ -423,6 +448,8 @@ trace, session, analytics, or event-ingestion framework.
 ## 10. Fail-closed rules
 
 - no outcome before the application is submitted;
+- no draft cancellation after submission or after any dependent semantic row
+  exists;
 - no submission with DRAFT/mismatched profile or intent;
 - no submission with incomplete, wrong-version, wrong-student, or
   wrong-program evaluation;
@@ -465,7 +492,7 @@ Reserved test `011` must cover:
 
 ### Lifecycle and idempotency
 
-- DRAFT → SUBMITTED → each permitted terminal path;
+- DRAFT → CANCELLED and DRAFT → SUBMITTED → each permitted terminal path;
 - WAITLISTED and UNKNOWN follow-up transitions;
 - terminal reopening rejection;
 - identical retry convergence and request-ID payload-conflict rejection;
@@ -487,6 +514,15 @@ Reserved test `011` must cover:
 - exact function caller whitelist;
 - no private actor identity exposure;
 - evaluator/catalog executors have no application/outcome authority.
+
+### Installer and hosted defaults
+
+- PostgreSQL 15 and PostgreSQL 17 dual-role installer stacks restore the
+  captured installer after executor-owned DDL;
+- no naked `RESET ROLE` occurs;
+- hosted default ACL rows remain byte-for-byte unchanged;
+- authenticated EXECUTE equals the prior whitelist plus exactly the approved
+  v019 owner/reviewer functions;
 
 ### Privacy and concurrency
 

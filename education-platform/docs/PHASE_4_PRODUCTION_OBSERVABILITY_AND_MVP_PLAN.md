@@ -27,6 +27,22 @@ Phase 4 does not change the frozen meanings of Eligibility or Fit. It does not
 implement Competitiveness, admission probability, ranking, recommendation, or
 learned weights.
 
+### 1.1 Confirmed pre-implementation gaps
+
+The frozen Phase 3 functions are behaviorally verified, but the Phase 4 review
+confirmed operational hardening work that must precede browser rollout:
+
+- all four functions currently use wildcard CORS;
+- bounded adapter failures currently return internal `error.message` and
+  `error.detail` values to the caller;
+- there is no shared server-generated request ID or closed public error
+  catalog;
+- content-type, body-size, deadline, and release-skew handling is repeated or
+  absent rather than governed by one shared boundary.
+
+These findings do not change the Phase 3 semantic result contract. Phase 4A
+must correct them in the Edge boundary and re-run the established remote smoke.
+
 ## 2. Frozen semantic boundaries
 
 - Eligibility answers whether explicit program requirements are satisfied,
@@ -57,11 +73,44 @@ functions and every new Phase 4 endpoint. It must provide:
   stable error code;
 - consistent mapping of authentication, authorization, lifecycle conflict,
   validation, dependency, and internal failures;
+- a closed public error catalog; raw exception messages, PostgREST details,
+  hints, SQLSTATE text, and nested causes never cross the response boundary;
+- explicit JSON content-type and bounded request-body enforcement;
+- an environment-configured browser-origin allowlist with exact preflight and
+  response behavior; wildcard CORS is forbidden in production;
 - automatic redaction before an event leaves the process.
 
 The first observability implementation is service-level. Migration 019 is
 reserved for Application/Outcome semantics. Any durable database operation
 receipt or trace table requires a separate additive migration after 019.
+
+#### Phase 4A-1 bounded implementation increment
+
+When separately authorized, the first mutation set is limited to:
+
+- one new shared Edge HTTP-boundary module and its pure unit/adversarial tests;
+- refactoring the four existing function `index.ts` files to use that module;
+- deployment configuration for allowed browser origins and release identity;
+- redeployment and anonymous/authenticated smoke of those four functions.
+
+It does not edit the generated Fit runtime bundle, Fit/Eligibility packages,
+database migrations, evaluator identity, result payloads, or SQL contracts.
+
+Browser-origin behavior is exact:
+
+- the server generates the request ID; an untrusted inbound request ID is not
+  adopted as the authoritative trace identity;
+- an allowlisted Origin receives that exact origin plus `Vary: Origin`;
+- an unknown browser Origin receives no CORS grant and its preflight is
+  rejected;
+- a non-browser request without Origin may proceed through normal
+  authentication but receives no wildcard CORS header;
+- `x-request-id` is exposed explicitly; credentials/cookies are not enabled.
+
+The success response bodies remain byte-for-byte compatible apart from the new
+response header. Failure bodies become a closed `{error, requestId}` envelope
+with an optional catalog-authored public message; no raw adapter/database text
+is returned.
 
 #### Allowed operational event fields
 
@@ -193,6 +242,8 @@ typed RPCs or Edge endpoints that:
 - use client request UUIDs for safe retry/idempotency;
 - call the existing controlled database functions and finalizers;
 - return stable error codes plus request ID, never internal SQL details;
+- return only a bounded public message selected from the stable error catalog,
+  never `error.message` or `error.detail` from adapter/database exceptions;
 - avoid placing the service-role credential in the browser.
 
 New API surface is grouped by capability rather than one endpoint per table:
