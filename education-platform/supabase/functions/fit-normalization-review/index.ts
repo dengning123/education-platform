@@ -14,7 +14,11 @@ const handleRequest = createEdgeHttpHandler({
   endpoint: "FIT_NORMALIZATION_REVIEW",
   internalErrorCode: "FIT_NORMALIZATION_REVIEW_FAILED_CLOSED",
   getEnv: (name: string) => Deno.env.get(name),
-  handler: async ({ body, authorization }: { body: unknown; authorization: string }) => {
+  handler: async ({ body, authorization, dependencyFetch }: {
+    body: unknown;
+    authorization: string;
+    dependencyFetch: typeof fetch;
+  }) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (supabaseUrl === undefined || anonKey === undefined) {
@@ -27,6 +31,7 @@ const handleRequest = createEdgeHttpHandler({
         supabaseUrl,
         anonKey,
         authorization.slice("Bearer ".length),
+        dependencyFetch,
       );
       const reviewed = await userDatabase.rpc("review_fit_financial_normalization_v017", {
         p_financial_normalization_id: parsed.normalizationId,

@@ -16,7 +16,11 @@ const handleRequest = createEdgeHttpHandler({
   endpoint: "FIT_NORMALIZATION_RESUME",
   internalErrorCode: "FIT_NORMALIZATION_RESUME_FAILED_CLOSED",
   getEnv: (name: string) => Deno.env.get(name),
-  handler: async ({ body, authorization }: { body: unknown; authorization: string }) => {
+  handler: async ({ body, authorization, dependencyFetch }: {
+    body: unknown;
+    authorization: string;
+    dependencyFetch: typeof fetch;
+  }) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -30,13 +34,19 @@ const handleRequest = createEdgeHttpHandler({
         supabaseUrl,
         anonKey,
         authorization.slice("Bearer ".length),
+        dependencyFetch,
       );
       const ownsProfile = await userDatabase.rpc<boolean>("current_user_owns_profile", {
         p_profile_version_id: parsed.evaluation.profileVersionId,
       });
       if (ownsProfile !== true) throw edgeHttpError("PROFILE_NOT_FOUND");
       const executed = await resumeFitEvaluation(
-        new FitExecutorPostgrestGateway(supabaseUrl, serviceRoleKey),
+        new FitExecutorPostgrestGateway(
+          supabaseUrl,
+          serviceRoleKey,
+          serviceRoleKey,
+          dependencyFetch,
+        ),
         parsed,
       );
       return jsonSuccess({

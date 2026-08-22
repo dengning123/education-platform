@@ -8,6 +8,7 @@ const ALLOWED_REQUEST_HEADERS = Object.freeze([
 const PUBLIC_ERROR_CATALOG = new Map([
   ["AUTHENTICATION_REQUIRED", 401],
   ["CORS_ORIGIN_DENIED", 403],
+  ["DEPENDENCY_DEADLINE_EXCEEDED", 504],
   ["FIT_EVALUATION_FAILED_CLOSED", 500],
   ["FIT_EVALUATION_REJECTED", 422],
   ["FIT_NORMALIZATION_PREPARATION_FAILED_CLOSED", 500],
@@ -20,13 +21,18 @@ const PUBLIC_ERROR_CATALOG = new Map([
   ["METHOD_NOT_ALLOWED", 405],
   ["PAYLOAD_TOO_LARGE", 413],
   ["PROFILE_NOT_FOUND", 404],
+  ["REQUEST_ABORTED", 408],
+  ["REQUEST_DEADLINE_EXCEEDED", 504],
   ["SERVICE_CONFIGURATION_MISSING", 500],
   ["UNSUPPORTED_MEDIA_TYPE", 415],
 ]);
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
+const DEFAULT_REQUEST_DEADLINE_MS = 50_000;
+const DEFAULT_DEPENDENCY_DEADLINE_MS = 10_000;
+export const EDGE_HTTP_BOUNDARY_VERSION = "fit-edge-http-v1";
 const CONFIG_VALUE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
-const STATUS_PATTERN = /^[1-5][0-9][0-9]$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class EdgeHttpError extends Error {
   constructor(code, status = undefined) {
@@ -110,17 +116,31 @@ export function parseAllowedOrigins(raw) {
 }
 
 export function readEdgeConfiguration(getEnv) {
-  return Object.freeze({
+  const configuration = {
     allowedOrigins: parseAllowedOrigins(getEnv("FIT_EDGE_ALLOWED_ORIGINS")),
-    releaseId: parseReleaseValue(getEnv("FIT_EDGE_RELEASE_ID")),
-    buildHash: parseReleaseValue(getEnv("FIT_EDGE_BUILD_HASH")),
+    semanticRelease: parseReleaseValue(getEnv("FIT_EDGE_SEMANTIC_RELEASE")),
+    deployedBuild: parseReleaseValue(getEnv("FIT_EDGE_DEPLOYED_BUILD")),
+    boundaryVersion: EDGE_HTTP_BOUNDARY_VERSION,
     maxBodyBytes: parseBoundedInteger(
       getEnv("FIT_EDGE_MAX_BODY_BYTES"),
       DEFAULT_MAX_BODY_BYTES,
       1024,
       1024 * 1024,
     ),
-  });
+    requestDeadlineMs: parseBoundedInteger(
+      getEnv("FIT_EDGE_REQUEST_DEADLINE_MS"),
+      DEFAULT_REQUEST_DEADLINE_MS,
+      1,
+      60_000,
+    ),
+    dependencyDeadlineMs: parseBoundedInteger(
+      getEnv("FIT_EDGE_DEPENDENCY_DEADLINE_MS"),
+      DEFAULT_DEPENDENCY_DEADLINE_MS,
+      1,
+      30_000,
+    ),
+  };
+  return Object.freeze(configuration);
 }
 
 function baseHeaders(requestId, origin, originAllowed) {
@@ -182,7 +202,45 @@ function isJsonContentType(request) {
   return raw !== null && raw.split(";", 1)[0].trim().toLowerCase() === "application/json";
 }
 
-async function readBoundedJson(request, maxBodyBytes) {
+function requestDeadlineError(deadline) {
+  return edgeHttpError(deadline.abortCode() ?? "REQUEST_DEADLINE_EXCEEDED");
+}
+
+function createRequestDeadline(request, deadlineMs) {
+  const controller = new AbortController();
+  let abortCode = null;
+  const abort = (code) => {
+    if (controller.signal.aborted) return;
+    abortCode = code;
+    controller.abort();
+  };
+  const onRequestAbort = () => abort("REQUEST_ABORTED");
+  if (request.signal.aborted) onRequestAbort();
+  else request.signal.addEventListener("abort", onRequestAbort, { once: true });
+  const timer = setTimeout(() => abort("REQUEST_DEADLINE_EXCEEDED"), deadlineMs);
+
+  return Object.freeze({
+    signal: controller.signal,
+    abortCode: () => abortCode,
+    dispose: () => {
+      clearTimeout(timer);
+      request.signal.removeEventListener("abort", onRequestAbort);
+    },
+  });
+}
+
+async function readBodyChunk(reader, deadline) {
+  if (deadline.signal.aborted) throw requestDeadlineError(deadline);
+  return await new Promise((resolve, reject) => {
+    const onAbort = () => reject(requestDeadlineError(deadline));
+    deadline.signal.addEventListener("abort", onAbort, { once: true });
+    reader.read().then(resolve, reject).finally(() => {
+      deadline.signal.removeEventListener("abort", onAbort);
+    });
+  });
+}
+
+async function readBoundedJson(request, maxBodyBytes, deadline) {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null) {
     if (!/^[0-9]+$/.test(contentLength)) throw edgeHttpError("PAYLOAD_TOO_LARGE");
@@ -193,15 +251,27 @@ async function readBoundedJson(request, maxBodyBytes) {
   const reader = request.body.getReader();
   const chunks = [];
   let length = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    length += value.byteLength;
-    if (length > maxBodyBytes) {
-      await reader.cancel("payload too large");
-      throw edgeHttpError("PAYLOAD_TOO_LARGE");
+  try {
+    while (true) {
+      const { done, value } = await readBodyChunk(reader, deadline);
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBodyBytes) {
+        await reader.cancel();
+        throw edgeHttpError("PAYLOAD_TOO_LARGE");
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch (error) {
+    if (deadline.signal.aborted) {
+      try {
+        await reader.cancel();
+      } catch {
+        // The public response is determined only by the closed deadline catalog.
+      }
+      throw requestDeadlineError(deadline);
+    }
+    throw error;
   }
 
   const bytes = new Uint8Array(length);
@@ -217,6 +287,42 @@ async function readBoundedJson(request, maxBodyBytes) {
   }
 }
 
+function createDependencyFetch(fetchImpl, requestDeadline, deadlineMs) {
+  return async function dependencyFetch(input, init = undefined) {
+    const controller = new AbortController();
+    let abortCode = null;
+    const abort = (code) => {
+      if (controller.signal.aborted) return;
+      abortCode = code;
+      controller.abort();
+    };
+    const onRequestDeadline = () => {
+      abort(requestDeadline.abortCode() ?? "REQUEST_DEADLINE_EXCEEDED");
+    };
+    const callerSignal = init?.signal;
+    const onCallerAbort = () => abort("REQUEST_ABORTED");
+
+    if (requestDeadline.signal.aborted) onRequestDeadline();
+    else requestDeadline.signal.addEventListener("abort", onRequestDeadline, { once: true });
+    if (callerSignal?.aborted) onCallerAbort();
+    else callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+
+    const timer = setTimeout(() => abort("DEPENDENCY_DEADLINE_EXCEEDED"), deadlineMs);
+    try {
+      const response = await fetchImpl(input, { ...init, signal: controller.signal });
+      if (abortCode !== null) throw edgeHttpError(abortCode);
+      return response;
+    } catch (error) {
+      if (abortCode !== null) throw edgeHttpError(abortCode);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      requestDeadline.signal.removeEventListener("abort", onRequestDeadline);
+      callerSignal?.removeEventListener("abort", onCallerAbort);
+    }
+  };
+}
+
 function validAuthorization(request) {
   const authorization = request.headers.get("authorization");
   if (authorization === null || !authorization.startsWith("Bearer ")) return null;
@@ -229,19 +335,45 @@ function statusClass(status) {
 }
 
 function emitEvent(log, event) {
-  log(JSON.stringify({
-    event: "FIT_EDGE_REQUEST_V1",
+  const status = Number.isInteger(event.status) && event.status >= 100 && event.status <= 599
+    ? event.status
+    : 500;
+  const durationMs = Number.isFinite(event.durationMs)
+    ? Math.min(600_000, Math.max(0, Math.round(event.durationMs)))
+    : 0;
+  const errorCode = event.errorCode !== null && PUBLIC_ERROR_CATALOG.has(event.errorCode)
+    ? event.errorCode
+    : null;
+  const operationalEvent = {
+    event: "FIT_EDGE_REQUEST_V2",
     requestId: event.requestId,
     endpoint: event.endpoint,
-    releaseId: event.releaseId,
-    buildHash: event.buildHash,
+    semanticRelease: event.semanticRelease,
+    deployedBuild: event.deployedBuild,
+    boundaryVersion: event.boundaryVersion,
     stage: "RESPONSE",
-    status: event.status,
-    statusClass: statusClass(event.status),
-    errorCode: event.errorCode,
-    durationMs: event.durationMs,
-    coldStart: event.coldStart,
-  }));
+    status,
+    statusClass: statusClass(status),
+    errorCode,
+    durationMs,
+    coldStart: event.coldStart === true,
+  };
+  try {
+    log(JSON.stringify(operationalEvent));
+  } catch {
+    // Operational logging must never change the HTTP result.
+  }
+}
+
+function serverRequestId(randomUUID) {
+  let candidate;
+  try {
+    candidate = randomUUID();
+  } catch {
+    candidate = null;
+  }
+  if (typeof candidate === "string" && UUID_PATTERN.test(candidate)) return candidate;
+  return crypto.randomUUID();
 }
 
 export function createEdgeHttpHandler({
@@ -252,11 +384,12 @@ export function createEdgeHttpHandler({
   log = console.log,
   now = () => performance.now(),
   randomUUID = () => crypto.randomUUID(),
+  fetchImpl = fetch,
 }) {
   if (typeof endpoint !== "string" || !CONFIG_VALUE_PATTERN.test(endpoint)) {
     throw new TypeError("Invalid Edge endpoint code");
   }
-  if (typeof handler !== "function" || typeof getEnv !== "function") {
+  if (typeof handler !== "function" || typeof getEnv !== "function" || typeof fetchImpl !== "function") {
     throw new TypeError("Invalid Edge handler configuration");
   }
   if (!PUBLIC_ERROR_CATALOG.has(internalErrorCode)) {
@@ -266,9 +399,10 @@ export function createEdgeHttpHandler({
   let coldStart = true;
   return async function edgeHttpHandler(request) {
     const startedAt = now();
-    const requestId = randomUUID();
+    const requestId = serverRequestId(randomUUID);
     const origin = request.headers.get("origin");
     let configuration;
+    let requestDeadline;
     let originAllowed = false;
     let response;
     let errorCode = null;
@@ -279,14 +413,26 @@ export function createEdgeHttpHandler({
       if (request.method === "OPTIONS") {
         response = preflightResponse(request, requestId, origin, originAllowed);
       } else {
+        requestDeadline = createRequestDeadline(request, configuration.requestDeadlineMs);
         if (origin !== null && !originAllowed) throw edgeHttpError("CORS_ORIGIN_DENIED");
         if (request.method !== "POST") throw edgeHttpError("METHOD_NOT_ALLOWED");
         if (!isJsonContentType(request)) throw edgeHttpError("UNSUPPORTED_MEDIA_TYPE");
         const authorization = validAuthorization(request);
         if (authorization === null) throw edgeHttpError("AUTHENTICATION_REQUIRED");
 
-        const body = await readBoundedJson(request, configuration.maxBodyBytes);
-        const result = await handler({ request, body, authorization, requestId });
+        const body = await readBoundedJson(request, configuration.maxBodyBytes, requestDeadline);
+        const dependencyFetch = createDependencyFetch(
+          fetchImpl,
+          requestDeadline,
+          configuration.dependencyDeadlineMs,
+        );
+        const result = await handler({
+          request,
+          body,
+          authorization,
+          requestId,
+          dependencyFetch,
+        });
         if (
           result === null ||
           typeof result !== "object" ||
@@ -308,18 +454,22 @@ export function createEdgeHttpHandler({
         ? false
         : originAllowed;
       response = publicErrorResponse(publicError, requestId, origin, errorOriginAllowed);
+    } finally {
+      requestDeadline?.dispose();
     }
 
-    const releaseId = configuration?.releaseId ?? "configuration-unavailable";
-    const buildHash = configuration?.buildHash ?? "configuration-unavailable";
+    const semanticRelease = configuration?.semanticRelease ?? "configuration-unavailable";
+    const deployedBuild = configuration?.deployedBuild ?? "configuration-unavailable";
+    const boundaryVersion = configuration?.boundaryVersion ?? EDGE_HTTP_BOUNDARY_VERSION;
     emitEvent(log, {
       requestId,
       endpoint,
-      releaseId,
-      buildHash,
+      semanticRelease,
+      deployedBuild,
+      boundaryVersion,
       status: response.status,
       errorCode,
-      durationMs: Math.max(0, Math.round(now() - startedAt)),
+      durationMs: now() - startedAt,
       coldStart,
     });
     coldStart = false;
