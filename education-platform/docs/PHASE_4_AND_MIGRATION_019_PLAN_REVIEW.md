@@ -6,6 +6,9 @@ Date: 2026-08-22
 
 Reviewed baseline: `phase3-fit-v0.1`
 
+Phase 4A-1 release/document baseline:
+`27d58545c5573f92051a31071bf345bf4d2446e2`
+
 Reviewed plans:
 
 - Reviewed pre-implementation Phase 4 plan hash at commit `8ee34f5`:
@@ -82,7 +85,9 @@ implementation authorization:
 - add one shared Edge HTTP-boundary module and tests;
 - refactor only the four existing Edge entrypoints;
 - configure exact allowed origins and release identity;
-- preserve success bodies and all Fit/Financial semantics;
+- preserve success-response fields, values, nullability, enum semantics,
+  status behavior, and all Fit/Financial semantics under a semantic/schema
+  compatibility contract;
 - deploy only after local tests and repeat the established remote smoke.
 
 It does not require a database migration and does not authorize UI work,
@@ -92,9 +97,15 @@ Migration 019, or Competitiveness.
 
 The user separately authorized exactly this increment. It is now implemented,
 deployed, and remotely verified at source build
-`4937ce0b4bf97f0de3190b0b202875f1b2198f12`; see
+`099a348e6b2ea9dc757efa2faacc675ba673ad5d`, with final release/document
+baseline `27d58545c5573f92051a31071bf345bf4d2446e2`; see
 [`PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md`](PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md).
 This completion does not authorize another Phase 4 increment.
+
+Supabase `verify_jwt=true` remains an intentional non-blocking platform
+boundary: a credential-free request can be rejected before the function runs,
+so that gateway-owned response has no shared request ID. Phase 4A-1 did not
+disable gateway JWT verification or add an outer proxy.
 
 ## 4. Migration 019 disposition
 

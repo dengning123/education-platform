@@ -94,8 +94,9 @@ receipt or trace table requires a separate additive migration after 019.
 
 **Completion:** separately authorized, implemented, deployed, and remotely
 verified at source build
-`4937ce0b4bf97f0de3190b0b202875f1b2198f12`. No further Phase 4 increment is
-authorized by that completion.
+`099a348e6b2ea9dc757efa2faacc675ba673ad5d`. The final release/document
+baseline is `27d58545c5573f92051a31071bf345bf4d2446e2`. No further Phase 4
+increment is authorized by that completion.
 
 The completed first mutation set was limited to:
 
@@ -118,10 +119,18 @@ Browser-origin behavior is exact:
   authentication but receives no wildcard CORS header;
 - `x-request-id` is exposed explicitly; credentials/cookies are not enabled.
 
-The success response bodies remain byte-for-byte compatible apart from the new
-response header. Failure bodies become a closed `{error, requestId}` envelope
-with an optional catalog-authored public message; no raw adapter/database text
-is returned.
+Success responses remain semantic/schema compatible; existing fields, values,
+nullability, enum semantics, and HTTP status behavior are unchanged. Exact JSON
+serialization byte equivalence is not required. Failure bodies that reach the
+shared function boundary use a closed `{error, requestId}` envelope with an
+optional catalog-authored public message; no raw adapter/database text is
+returned.
+
+Known non-blocking platform boundary exception: with `verify_jwt=true`,
+Supabase may reject a credential-free request before the Edge Function runs.
+That gateway-owned response does not contain the shared server-generated
+request ID. Changing the platform JWT boundary or adding an outer proxy was not
+part of Phase 4A-1.
 
 #### Allowed operational event fields
 
