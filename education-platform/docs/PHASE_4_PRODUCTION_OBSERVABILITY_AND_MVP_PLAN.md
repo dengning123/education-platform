@@ -1,6 +1,6 @@
 # Phase 4 Production Observability and Minimum Product Loop Plan
 
-Status: **PLANNING ONLY — IMPLEMENTATION NOT YET AUTHORIZED**
+Status: **PHASE 4A-1 DEPLOYED AND VERIFIED — REMAINDER PLANNING ONLY**
 
 Date: 2026-08-22
 
@@ -27,7 +27,7 @@ Phase 4 does not change the frozen meanings of Eligibility or Fit. It does not
 implement Competitiveness, admission probability, ranking, recommendation, or
 learned weights.
 
-### 1.1 Confirmed pre-implementation gaps
+### 1.1 Confirmed gaps that drove Phase 4A-1
 
 The frozen Phase 3 functions are behaviorally verified, but the Phase 4 review
 confirmed operational hardening work that must precede browser rollout:
@@ -40,8 +40,14 @@ confirmed operational hardening work that must precede browser rollout:
 - content-type, body-size, deadline, and release-skew handling is repeated or
   absent rather than governed by one shared boundary.
 
-These findings do not change the Phase 3 semantic result contract. Phase 4A
-must correct them in the Edge boundary and re-run the established remote smoke.
+These findings do not change the Phase 3 semantic result contract. Phase 4A-1
+closed the shared request ID, CORS, content-type/body-size, error-redaction,
+and release-identity boundary and re-ran the established remote smoke. A hard
+application deadline is intentionally deferred because the frozen Fit runtime
+cannot cancel in-flight database work; returning a timeout while a finalizer
+may still commit would make retries unsafe. Its final disposition is recorded
+in
+[`PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md`](PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md).
 
 ## 2. Frozen semantic boundaries
 
@@ -86,7 +92,12 @@ receipt or trace table requires a separate additive migration after 019.
 
 #### Phase 4A-1 bounded implementation increment
 
-When separately authorized, the first mutation set is limited to:
+**Completion:** separately authorized, implemented, deployed, and remotely
+verified at source build
+`4937ce0b4bf97f0de3190b0b202875f1b2198f12`. No further Phase 4 increment is
+authorized by that completion.
+
+The completed first mutation set was limited to:
 
 - one new shared Edge HTTP-boundary module and its pure unit/adversarial tests;
 - refactoring the four existing function `index.ts` files to use that module;
@@ -345,7 +356,8 @@ The reviewer experience is separate from the student experience. It must:
 
 ## 9. Authorization boundary
 
-This document records the Phase 4 implementation plan only. It does not
-authorize code, infrastructure, dashboard, UI, migration, storage, monitoring
-vendor, or production rollout changes. Each implementation increment starts
+This document records the Phase 4 plan and the completion state of the
+separately authorized Phase 4A-1 increment. It does not authorize any further
+code, infrastructure, dashboard, UI, migration, storage, monitoring vendor, or
+production rollout changes. Each subsequent implementation increment starts
 only after its scope and mutation authority are separately approved.

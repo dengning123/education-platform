@@ -1,6 +1,6 @@
 # Phase 4 and Migration 019 Plan Review
 
-Status: **ARCHITECTURE REVIEW PASSED — IMPLEMENTATION STILL REQUIRES EXPLICIT AUTHORIZATION**
+Status: **PHASE 4A-1 RELEASED — MIGRATION 019 STILL REQUIRES EXPLICIT AUTHORIZATION**
 
 Date: 2026-08-22
 
@@ -8,7 +8,7 @@ Reviewed baseline: `phase3-fit-v0.1`
 
 Reviewed plans:
 
-- Phase 4 plan hash:
+- Reviewed pre-implementation Phase 4 plan hash at commit `8ee34f5`:
   `809c548b913fa4bffcd28a486ca2a6d1c16716f892902ddd22f3977555d3bf00`
 - Migration 019 plan hash:
   `4078b70ecce10ada23dc837389c7b231c91de510cb52f2a683e14b4d970e49e6`
@@ -87,6 +87,14 @@ implementation authorization:
 
 It does not require a database migration and does not authorize UI work,
 Migration 019, or Competitiveness.
+
+### 3.1 Subsequent implementation disposition
+
+The user separately authorized exactly this increment. It is now implemented,
+deployed, and remotely verified at source build
+`4937ce0b4bf97f0de3190b0b202875f1b2198f12`; see
+[`PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md`](PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md).
+This completion does not authorize another Phase 4 increment.
 
 ## 4. Migration 019 disposition
 

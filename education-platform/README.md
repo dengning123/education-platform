@@ -284,8 +284,11 @@ cleaned up. The release evidence is recorded in
 and the authoritative final state is
 [docs/PHASE_3_FREEZE.md](docs/PHASE_3_FREEZE.md).
 
-Phase 4 is currently planning-only. The production observability and minimum
-product-loop plan is
+Phase 4A-1 is implemented, deployed, and remotely verified. Its shared Edge
+HTTP boundary release record is
+[docs/PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md](docs/PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md).
+The remaining production observability and minimum product-loop work is still
+planning-only in
 [docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md](docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
 The proposed Application/Outcome data contract is
 [docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
