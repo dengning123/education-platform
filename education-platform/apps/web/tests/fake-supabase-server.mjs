@@ -423,6 +423,19 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (rpc === "get_profile_taxonomy_projection_v022") {
+      const requested = body.p_profile_version_id;
+      const profile = requested === null || requested === undefined ? state.draft : state.draft?.id === requested ? state.draft : state.frozen.get(requested);
+      if (!profile) return rpcError(response, 404, "PROFILE_NOT_FOUND", "P0002");
+      send(response, 200, {
+        schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022",
+        releaseCode: "v0.1",
+        releaseOrdinal: 1,
+        concepts: [],
+      });
+      return;
+    }
+
     if (rpc === "mutate_profile_draft_v019") {
       if (!state.draft || state.draft.id !== body.p_profile_version_id) return rpcError(response, 404, "PROFILE_NOT_FOUND", "P0002");
       const operationId = String(body.p_operation_id ?? "");

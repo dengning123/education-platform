@@ -7,11 +7,13 @@ import {
   parseProfileDocument,
   parseProfileOperationResult,
   parseProfileReadiness,
+  parseProfileTaxonomyProjection,
   type ProfileAccount,
   type ProfileDocument,
   type ProfileMutationCommand,
   type ProfileOperationResult,
   type ProfileReadiness,
+  type ProfileTaxonomyProjection,
 } from "@/lib/profile/contracts";
 import { mapProfileRpcError, ProfileServiceError } from "@/lib/profile/errors";
 import { createClient } from "@/lib/supabase/server";
@@ -22,6 +24,7 @@ export interface ProfileService {
   createOrResume(operationId: string): Promise<ProfileOperationResult>;
   currentDocument(): Promise<ProfileDocument>;
   readiness(profileVersionId: string): Promise<ProfileReadiness>;
+  taxonomy(profileVersionId: string | null): Promise<ProfileTaxonomyProjection>;
   mutate(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number } & ProfileMutationCommand>): Promise<ProfileOperationResult>;
   freeze(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }>): Promise<ProfileOperationResult>;
   fork(input: Readonly<{ sourceProfileVersionId: string; operationId: string }>): Promise<ProfileOperationResult>;
@@ -89,6 +92,10 @@ class SupabaseProfileService implements ProfileService {
 
   async readiness(profileVersionId: string): Promise<ProfileReadiness> {
     return parseProfileReadiness(await this.rpc("get_profile_readiness_v019", { p_profile_version_id: profileVersionId }));
+  }
+
+  async taxonomy(profileVersionId: string | null): Promise<ProfileTaxonomyProjection> {
+    return parseProfileTaxonomyProjection(await this.rpc("get_profile_taxonomy_projection_v022", { p_profile_version_id: profileVersionId }));
   }
 
   async mutate(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number } & ProfileMutationCommand>): Promise<ProfileOperationResult> {

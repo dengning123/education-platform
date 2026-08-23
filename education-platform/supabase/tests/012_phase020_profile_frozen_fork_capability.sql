@@ -1,5 +1,7 @@
--- Runs after Migration 020. Test identity 013 remains reserved for the
--- unimplemented Migration 021 Application/Outcome contract.
+-- Runs after Migration 020 as test identity 012. Test identity 013 belongs to
+-- Migration 021 Hosted Auth Subject Compatibility Repair, and test identity
+-- 014 belongs to Migration 022 Profile Taxonomy Projection. Application/Outcome
+-- remains planning-only under a provisional future Migration 023 identity.
 
 begin;
 

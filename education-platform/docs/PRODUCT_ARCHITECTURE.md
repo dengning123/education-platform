@@ -323,11 +323,15 @@ Ranking, probability, recommendation, and Competitiveness remain unimplemented.
 The next planning milestone is Phase 4 production observability and a minimum
 authenticated product loop; see
 [`PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md`](PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
-The separately bounded Migration 021 Application/Outcome proposal is recorded
+The separately bounded provisional Migration 023 Application/Outcome proposal is recorded
 in
-[`MIGRATION_021_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_021_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-Both are planning-only. No Migration 021 SQL or Competitiveness implementation
-exists.
+[`MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+Its migration number remains provisional until implementation authorization.
+No Migration 023 SQL or Competitiveness implementation exists. Migration 021
+is limited to hosted Auth subject compatibility, and Migration 022 is limited
+to the owner-scoped Profile taxonomy label projection and remains paused and
+not baseline-ready. Neither authorizes Application/Outcome or Competitiveness
+behavior.
 
 Do not implement the full future architecture now. Add no speculative tables,
 services, matching engines, or model pipelines merely because they appear in

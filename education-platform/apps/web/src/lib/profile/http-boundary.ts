@@ -5,6 +5,7 @@ import {
   parseMutationRequest,
   parseProfileIdRequest,
   parseRevisionRequest,
+  parseTaxonomyRequest,
   ProfileContractError,
 } from "./contracts";
 import {
@@ -16,7 +17,7 @@ import type { ProfileService, ProfileServiceFactory } from "./service";
 
 export const PROFILE_HTTP_BOUNDARY_VERSION = "profile-http-v1";
 export const PROFILE_CONNECTION_BUILD = "phase4b-1b2a-local";
-export const PROFILE_CAPABILITIES = ["bootstrap", "draft", "document", "readiness", "mutate", "freeze", "fork"] as const;
+export const PROFILE_CAPABILITIES = ["bootstrap", "draft", "document", "readiness", "taxonomy", "mutate", "freeze", "fork"] as const;
 export type ProfileCapability = (typeof PROFILE_CAPABILITIES)[number];
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -185,6 +186,10 @@ async function executeCapability(capability: ProfileCapability, body: unknown, s
     case "readiness": {
       const input = parseProfileIdRequest(body);
       return service.readiness(input.profileVersionId);
+    }
+    case "taxonomy": {
+      const input = parseTaxonomyRequest(body);
+      return service.taxonomy(input.profileVersionId);
     }
     case "mutate":
       return service.mutate(parseMutationRequest(body));

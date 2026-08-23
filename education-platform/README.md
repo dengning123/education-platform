@@ -23,11 +23,15 @@ supabase db reset
 The golden record is a data migration, so `db reset` installs both the schema
 and its verified data. `supabase/config.toml` deliberately disables a separate
 seed file. The active local migration directory contains migrations
-`001`–`020`; migrations `001`–`018` remain frozen. Additive Migration `019`
+`001`–`022`; migrations `001`–`018` remain frozen. Additive Migration `019`
 provides the local-only Profile draft/readiness/freeze backend capability, and
-Migration `020` adds the local-only Frozen Profile to new DRAFT fork. Neither
-has been deployed. The separately planned Application/Outcome contract is
-reserved for Migration `021` and remains unimplemented.
+Migration `020` adds the local-only Frozen Profile to new DRAFT fork. Migration
+`021` repairs hosted Auth subject extraction without expanding Auth ACLs, and
+Migration `022` adds the local-only owner-scoped Profile taxonomy label
+projection but remains paused and not baseline-ready. None of `019`–`022` has
+been deployed. The separately planned
+Application/Outcome contract has a provisional future Migration `023` identity and remains
+unimplemented pending separate implementation authorization.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
 executor membership grant path; PostgreSQL 16+ uses the authorized
@@ -302,9 +306,10 @@ The remaining production observability and minimum product-loop work is still
 planning-only in
 [docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md](docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_021_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_021_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 021 SQL, Application/Outcome runtime, or Competitiveness model is
-implemented or authorized by those documents.
+[docs/MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 023 SQL, Application/Outcome runtime, or Competitiveness model is
+implemented or authorized by those documents. The 023 number remains
+provisional until implementation authorization.
 The original Migration 020 plan disposition is preserved as historical
 provenance in
 [docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md](docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md).

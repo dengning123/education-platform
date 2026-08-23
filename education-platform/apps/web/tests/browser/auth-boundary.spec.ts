@@ -130,6 +130,12 @@ test("an authenticated Profile draft reaches only the same-origin Next boundary"
   await page.getByRole("button", { name: "Start Profile draft" }).click();
   await expect(page.getByTestId("profile-draft-core")).toBeVisible();
   await expect(page.getByTestId("profile-live-status")).toContainText("Request ID:");
+  const taxonomy = await profilePost(page, "taxonomy", {});
+  expect(taxonomy.status).toBe(200);
+  expect(taxonomy.body).toEqual(expect.objectContaining({
+    data: expect.objectContaining({ schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022", releaseCode: "v0.1" }),
+  }));
+  expect(taxonomy.requestId).toBe(taxonomy.body.requestId);
 
   expect(requests.some((url) => /\/api\/profile\//.test(url))).toBe(true);
   expect(requests.some((url) => /\/rest\/v1\/rpc\//.test(url))).toBe(false);
@@ -178,6 +184,10 @@ test("an unrelated session cannot read another owner's Profile through the Next 
   expect(unrelated.body).toEqual(expect.objectContaining({ error: "RESOURCE_NOT_FOUND" }));
   expect(JSON.stringify(unrelated.body)).not.toContain("Internal fake PostgREST detail");
   expect(JSON.stringify(unrelated.body)).not.toContain("Internal fake hint");
+  const unrelatedTaxonomy = await profilePost(bob, "taxonomy", { profileVersionId: aliceProfileId });
+  expect(unrelatedTaxonomy.status).toBe(404);
+  expect(unrelatedTaxonomy.body).toEqual(expect.objectContaining({ error: "RESOURCE_NOT_FOUND" }));
+  expect(JSON.stringify(unrelatedTaxonomy.body)).not.toContain("Internal fake PostgREST detail");
 
   await aliceContext.close();
   await bobContext.close();

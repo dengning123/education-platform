@@ -1,14 +1,18 @@
-# Migration 021 Application and Outcome Data Contract Plan
+# Migration 023 Application and Outcome Data Contract Plan
 
 Status: **PLANNING ONLY — NO MIGRATION SQL AUTHORIZED OR CREATED**
 
 Date: 2026-08-22
 
 Reserved migration identity:
-`202608230021_application_outcome_contract.sql`
+`202608230023_application_outcome_contract.sql`
 
 Reserved test identity:
-`supabase/tests/013_phase021_application_outcome_contract.sql`
+`supabase/tests/015_phase023_application_outcome_contract.sql`
+
+Migration 023 is a provisional future planning number until separate
+Application/Outcome implementation authorization. It is not a permanently
+reserved slot and no Migration 023 SQL exists.
 
 Frozen upstream baseline: commit
 `55296e1aeca9a25b066e9010c376f0e618af59d1`, tag `phase3-fit-v0.1`,
@@ -16,7 +20,7 @@ migrations `001`–`018`
 
 ## 1. Purpose
 
-Migration 021 will define a privacy-aware, version-pinned record of a real
+Migration 023 will define a privacy-aware, version-pinned record of a real
 student application and its reported/reviewed admission outcome. Its purpose
 is operational application tracking and trustworthy future data collection.
 
@@ -53,7 +57,7 @@ consent, bias, calibration, and privacy review.
 
 ## 3. Proposed types
 
-Migration 021 creates new types rather than altering frozen enums:
+Migration 023 creates new types rather than altering frozen enums:
 
 ```text
 application_lifecycle_state
@@ -154,7 +158,7 @@ Pinned student and decision context:
 - copied Fit contract release, evaluator build ID/name/version/build hash,
   candidate/decision/result fingerprints, and evaluation-as-of time;
 - copied program admission-cycle start/end, entry term, and entry year;
-- discriminator exactly `APPLICATION_SNAPSHOT_V021`;
+- discriminator exactly `APPLICATION_SNAPSHOT_V023`;
 - canonical `application_snapshot_fingerprint` as lowercase SHA-256;
 - `sealed_at` and `submission_request_id`.
 
@@ -197,11 +201,11 @@ outcome.
 
 No raw document, email, portal content, free-form explanation, URL, or storage
 path is stored in this table. Evidence binaries require a separately approved
-storage/privacy design. Migration 021 retains only typed metadata and a hash.
+storage/privacy design. Migration 023 retains only typed metadata and a hash.
 
 `DOCUMENT_VERIFIED` or `SOURCE_VERIFIED` may be written only after the reviewer
 has accessed the evidence through a separately approved ephemeral evidence
-delivery or direct-source confirmation path. Without that path, v021 permits
+delivery or direct-source confirmation path. Without that path, v023 permits
 only `PLAUSIBILITY_REVIEWED`; a content hash alone is never treated as proof.
 
 Supersession constraints prevent self-supersession, branching from one prior
@@ -298,7 +302,7 @@ future model research:
 - occurred-at timestamp.
 
 `public.application_research_consent_heads` points to the current event under
-the same lock discipline. Consent is application-specific in v021. It does not
+the same lock discipline. Consent is application-specific in v023. It does not
 authorize training by itself; a future model phase must define extraction,
 withdrawal, retention, and previously trained-model handling.
 
@@ -311,15 +315,15 @@ privacy deletion removes both.
 Proposed public functions:
 
 ```text
-create_student_application_v021(...typed arguments...) -> application_id
-update_student_application_draft_v021(...typed arguments...) -> void
-cancel_student_application_draft_v021(application_id, request_id) -> void
-submit_student_application_v021(...pinned IDs..., request_id) -> snapshot result
-report_application_outcome_v021(...typed arguments...) -> observation_id
-list_application_outcome_review_queue_v021(limit, cursor) -> bounded rows
-get_application_outcome_review_candidate_v021(observation_id) -> bounded row
-review_application_outcome_v021(...typed arguments...) -> review/selection result
-record_application_research_consent_v021(...typed arguments...) -> consent_event_id
+create_student_application_v023(...typed arguments...) -> application_id
+update_student_application_draft_v023(...typed arguments...) -> void
+cancel_student_application_draft_v023(application_id, request_id) -> void
+submit_student_application_v023(...pinned IDs..., request_id) -> snapshot result
+report_application_outcome_v023(...typed arguments...) -> observation_id
+list_application_outcome_review_queue_v023(limit, cursor) -> bounded rows
+get_application_outcome_review_candidate_v023(observation_id) -> bounded row
+review_application_outcome_v023(...typed arguments...) -> review/selection result
+record_application_research_consent_v023(...typed arguments...) -> consent_event_id
 ```
 
 Contracts:
@@ -372,7 +376,7 @@ membership.
 - private submitter/reviewer tables have no external SELECT;
 - revoke function EXECUTE from PUBLIC, anon, service_role, authenticator, and
   unrelated foundation roles before granting the exact caller set;
-- add an exact authenticated-function whitelist assertion to test 013.
+- add an exact authenticated-function whitelist assertion to test 014.
 
 Reviewers receive no table-level SELECT. Their only read authority is the two
 bounded claim-gated reviewer RPCs.
@@ -382,7 +386,7 @@ contract established by 012/013/015: PostgreSQL 15 behavior remains unchanged,
 PostgreSQL 16+ membership options are applied only where supported, the
 original installer role is captured and restored without a naked
 `RESET ROLE`, and temporary executor schema `CREATE` is revoked before commit.
-Migration 021 must not modify hosted Supabase platform default ACLs. It revokes
+Migration 023 must not modify hosted Supabase platform default ACLs. It revokes
 implicit function EXECUTE on its own functions and proves the resulting exact
 whitelist instead.
 
@@ -417,11 +421,11 @@ Concurrency tests must prove:
 
 ## 8. Privacy deletion
 
-All public and private v021 tables are student-owned and cascade from
-`students` or `student_applications`. Migration 021 must replace only the
+All public and private v023 tables are student-owned and cascade from
+`students` or `student_applications`. Migration 023 must replace only the
 current `private.close_student_owned_rows(uuid)` definition, preserving its
 identity, owner, callers, search path, and all 001–019 checks while appending an
-exhaustive v021 anti-join inventory.
+exhaustive v023 anti-join inventory.
 
 It must not replace `public.delete_student_data(uuid,text)` or invent a second
 student lock/deletion path.
@@ -430,7 +434,7 @@ The deletion test proves zero remaining applications, snapshots,
 observations, actor links, reviews, selections, heads, consent events, and
 consent heads. Only the existing non-linkable deletion tombstone may remain.
 
-Because v021 stores no raw evidence object or storage locator, it does not
+Because v023 stores no raw evidence object or storage locator, it does not
 claim to solve binary evidence deletion. Any later evidence storage feature
 must extend the deletion contract and remote smoke before release.
 
@@ -442,7 +446,7 @@ not use global `public.audit_events` because that table is not a student-owned
 privacy boundary.
 
 Infrastructure telemetry records only aggregate endpoint/error/latency data
-under the Phase 4 observability plan. Migration 021 creates no generic log,
+under the Phase 4 observability plan. Migration 023 creates no generic log,
 trace, session, analytics, or event-ingestion framework.
 
 ## 10. Fail-closed rules
@@ -459,7 +463,7 @@ trace, session, analytics, or event-ingestion framework.
 - no document/portal/email evidence source without a valid content hash;
 - no selected outcome without its exact VERIFIED review;
 - no cross-application supersession or selection;
-- no terminal-state reopening in v021;
+- no terminal-state reopening in v023;
 - no NULL used to mean UNKNOWN and no UNKNOWN interpreted as NO_DECISION;
 - no consent inferred from reporting an outcome;
 - no model/training eligibility flag inferred from verification or consent;
@@ -469,7 +473,7 @@ trace, session, analytics, or event-ingestion framework.
 ## 11. Compatibility and migration execution
 
 - migrations `001`–`018` remain byte-for-byte unchanged;
-- v021 is additive except for the bounded replacement of the private privacy
+- v023 is additive except for the bounded replacement of the private privacy
   closure helper and additive grants/policies;
 - existing Eligibility/Fit rows and APIs are unchanged;
 - no new values are added to existing enums;
@@ -481,7 +485,7 @@ trace, session, analytics, or event-ingestion framework.
 
 ## 12. Required test matrix
 
-Reserved test `013` must cover:
+Reserved test `014` must cover:
 
 ### Schema and version pins
 
@@ -522,11 +526,11 @@ Reserved test `013` must cover:
 - no naked `RESET ROLE` occurs;
 - hosted default ACL rows remain byte-for-byte unchanged;
 - authenticated EXECUTE equals the prior whitelist plus exactly the approved
-  v021 owner/reviewer functions;
+  v023 owner/reviewer functions;
 
 ### Privacy and concurrency
 
-- deletion removes every v021 public/private row and retains only the existing
+- deletion removes every v023 public/private row and retains only the existing
   non-linkable tombstone;
 - deletion races with create, submit, report, review, selection, and consent;
 - concurrent review/head and consent-head updates serialize;
@@ -534,9 +538,9 @@ Reserved test `013` must cover:
 
 ### Upgrade/regression
 
-- clean PostgreSQL 15 and target PostgreSQL 17 `001→021`;
-- populated `020→021` with completed Eligibility/Fit history unchanged;
-- ordered SQL suites `001`–`011`;
+- clean PostgreSQL 15 and target PostgreSQL 17 `001→023`;
+- populated `022→023` with completed Eligibility/Fit history unchanged;
+- ordered SQL suites `001`–`014`;
 - Eligibility 12/12, Fit 14/14, adapter 8/8;
 - existing four-function anonymous/authenticated remote smoke unchanged;
 - new Application/Outcome remote smoke with complete cleanup after explicit
@@ -551,10 +555,10 @@ Reserved test `013` must cover:
 - automated scraping of school portals or email;
 - raw evidence/document storage;
 - generalized audit, analytics, workflow, queue, or plugin frameworks;
-- bulk historical imports or applications lacking the complete v021 submission
+- bulk historical imports or applications lacking the complete v023 submission
   snapshot;
 - changes to Phase 3 result semantics;
-- implementation or deployment of Migration 021.
+- implementation or deployment of Migration 023.
 
 ## 14. Approval gate
 
@@ -572,5 +576,5 @@ Before SQL implementation, an independent review must mechanically close:
 - raw evidence storage exclusion;
 - clean/upgrade/remote test plan.
 
-Until that review and explicit implementation authorization, Migration 021
-remains a reserved planning identity only.
+Until that review and explicit implementation authorization, Migration 023
+remains a provisional planning identity only.

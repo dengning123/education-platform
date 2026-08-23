@@ -6,6 +6,7 @@ import type {
   ProfileMutationCommand,
   ProfileOperationResult,
   ProfileReadiness,
+  ProfileTaxonomyProjection,
 } from "./contracts";
 import { ProfileServiceError } from "./errors";
 import { createProfileRouter } from "./http-boundary";
@@ -35,6 +36,13 @@ const document: ProfileDocument = {
   frozenAt: null,
   readiness,
   evidenceItems: [], degrees: [], courses: [], testScores: [], experiences: [], skills: [], experienceSkills: [], goals: [], preferences: [], mappings: [],
+};
+
+const taxonomy: ProfileTaxonomyProjection = {
+  schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022",
+  releaseCode: "v0.1",
+  releaseOrdinal: 1,
+  concepts: [],
 };
 
 class MockProfileService implements ProfileService {
@@ -74,6 +82,12 @@ class MockProfileService implements ProfileService {
     this.fail();
     this.calls.push({ method: "readiness", input });
     return readiness;
+  }
+
+  async taxonomy(input: string | null): Promise<ProfileTaxonomyProjection> {
+    this.fail();
+    this.calls.push({ method: "taxonomy", input });
+    return taxonomy;
   }
 
   async mutate(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number } & ProfileMutationCommand>): Promise<ProfileOperationResult> {
@@ -217,6 +231,21 @@ describe("Profile HTTP boundary", () => {
     expect(service.calls).toContainEqual({ method: "fork", input: { sourceProfileVersionId: profileId, operationId } });
     const studentIdAttempt = await handler(request(JSON.stringify({ sourceProfileVersionId: profileId, operationId, studentId: profileId })), context("fork"));
     expect(studentIdAttempt.status).toBe(422);
+  });
+
+  it("accepts only an optional Profile version for owner-scoped taxonomy projection", async () => {
+    const service = new MockProfileService();
+    const handler = router(service);
+    const current = await handler(request("{}"), context("taxonomy"));
+    const explicit = await handler(request(JSON.stringify({ profileVersionId: profileId })), context("taxonomy"));
+    const enumeration = await handler(request(JSON.stringify({ profileVersionId: profileId, conceptIds: [operationId] })), context("taxonomy"));
+    const ownership = await handler(request(JSON.stringify({ studentId: profileId })), context("taxonomy"));
+    expect(current.status).toBe(200);
+    expect(explicit.status).toBe(200);
+    expect(service.calls).toContainEqual({ method: "taxonomy", input: null });
+    expect(service.calls).toContainEqual({ method: "taxonomy", input: profileId });
+    expect(enumeration.status).toBe(422);
+    expect(ownership.status).toBe(422);
   });
 
   it("maps active-draft and cross-owner/not-found service outcomes without leakage", async () => {

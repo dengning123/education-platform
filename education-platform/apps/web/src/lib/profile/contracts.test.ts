@@ -12,6 +12,8 @@ import {
   parseProfileDocument,
   parseProfileMutationCommand,
   parseProfileOperationResult,
+  parseProfileTaxonomyProjection,
+  parseTaxonomyRequest,
 } from "./contracts";
 
 const id = (suffix: string) => `00000000-0000-4000-8000-${suffix.padStart(12, "0")}`;
@@ -139,5 +141,38 @@ describe("Profile response DTO contract", () => {
     };
     expect(parseProfileOperationResult(link)).toMatchObject({ operation: "MUTATE", resourceKey: link.resourceKey });
     expect(() => parseProfileOperationResult({ ...link, resourceKey: { ...link.resourceKey, studentId: id("35") } })).toThrow("INVALID_REQUEST");
+  });
+});
+
+describe("Profile taxonomy projection contract", () => {
+  const concepts = [
+    { conceptId: id("40"), canonicalKey: "COURSE_CONCEPT.CALCULUS", conceptKind: "COURSE_CONCEPT", displayName: "Calculus", activeAtRelease: true },
+    { conceptId: id("41"), canonicalKey: "FIELD.ECONOMICS", conceptKind: "FIELD", displayName: "Economics", activeAtRelease: false },
+  ];
+  const projection = {
+    schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022",
+    releaseCode: "v0.2",
+    releaseOrdinal: 2,
+    concepts,
+  };
+
+  it("accepts the exact deterministic capability DTO and optional owner Profile input", () => {
+    expect(parseProfileTaxonomyProjection(projection)).toEqual(projection);
+    expect(parseTaxonomyRequest({})).toEqual({ profileVersionId: null });
+    expect(parseTaxonomyRequest({ profileVersionId: id("30") })).toEqual({ profileVersionId: id("30") });
+  });
+
+  it("rejects extra catalog fields, disallowed kinds, duplicates, and nondeterministic order", () => {
+    expect(() => parseProfileTaxonomyProjection({ ...projection, aliases: [] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyProjection({ ...projection, concepts: [{ ...concepts[0], description: "internal" }] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyProjection({ ...projection, concepts: [{ ...concepts[0], conceptKind: "SKILL" }] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyProjection({ ...projection, concepts: [concepts[1], concepts[0]] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyProjection({ ...projection, concepts: [concepts[0], { ...concepts[1], conceptId: concepts[0].conceptId }] })).toThrow("INVALID_REQUEST");
+  });
+
+  it("rejects caller-supplied ownership and arbitrary concept enumeration", () => {
+    expect(() => parseTaxonomyRequest({ studentId: id("31") })).toThrow("INVALID_REQUEST");
+    expect(() => parseTaxonomyRequest({ conceptIds: [id("40")] })).toThrow("INVALID_REQUEST");
+    expect(() => parseTaxonomyRequest({ profileVersionId: "not-a-uuid" })).toThrow("INVALID_REQUEST");
   });
 });

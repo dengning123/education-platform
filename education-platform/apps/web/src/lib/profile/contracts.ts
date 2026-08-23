@@ -30,6 +30,7 @@ export const PROFILE_EXPERIENCE_TYPES = [
 export const PROFILE_GOAL_TYPES = ["CAREER", "INDUSTRY", "FIELD", "OTHER"] as const;
 export const PROFILE_PREFERENCE_TYPES = ["LOCATION", "DELIVERY_MODE", "BUDGET", "PROGRAM_LENGTH"] as const;
 export const PROFILE_MAPPING_STATUSES = ["PROPOSED", "VERIFIED", "REJECTED", "RETIRED"] as const;
+export const PROFILE_TAXONOMY_CONCEPT_KINDS = ["FIELD", "SUBFIELD", "COURSE_CONCEPT"] as const;
 export const PROFILE_SECTION_SCORE_KEYS = [
   "quantitative",
   "verbal",
@@ -436,6 +437,19 @@ export type ProfileDocument = Readonly<{
 
 export type ProfileAccount = Readonly<{ schemaVersion: "PROFILE_ACCOUNT_V019"; accountState: "ACTIVE"; hasCurrentDraft: boolean }>;
 export type ProfileOperationResult = Readonly<Record<string, unknown> & { schemaVersion: "PROFILE_OPERATION_RESULT_V019" | "PROFILE_OPERATION_RESULT_V020"; operation: "CREATE_OR_RESUME" | "MUTATE" | "FREEZE" | "FORK_FROZEN"; profileVersionId: string; revision: number }>;
+export type ProfileTaxonomyConcept = Readonly<{
+  conceptId: string;
+  canonicalKey: string;
+  conceptKind: (typeof PROFILE_TAXONOMY_CONCEPT_KINDS)[number];
+  displayName: string;
+  activeAtRelease: boolean;
+}>;
+export type ProfileTaxonomyProjection = Readonly<{
+  schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022";
+  releaseCode: string;
+  releaseOrdinal: number;
+  concepts: readonly ProfileTaxonomyConcept[];
+}>;
 
 type ClosedField = Readonly<{ key: string; kind: "boolean" | "enum" | "integer" | "nullableHash" | "nullableInteger" | "nullableNumber" | "nullableString" | "nullableUuid" | "number" | "object" | "string" | "uuid"; values?: readonly string[] }>;
 
@@ -567,6 +581,37 @@ export function parseProfileDocument(value: unknown): ProfileDocument {
   }) as ProfileDocument;
 }
 
+export function parseProfileTaxonomyProjection(value: unknown): ProfileTaxonomyProjection {
+  const object = closedResponseObject(value, ["schemaVersion", "releaseCode", "releaseOrdinal", "concepts"]);
+  if (object.schemaVersion !== "PROFILE_TAXONOMY_PROJECTION_V022") invalid();
+  const releaseCode = textValue(object.releaseCode);
+  const releaseOrdinal = integer(object.releaseOrdinal);
+  if (!/^v[0-9]+\.[0-9]+$/.test(releaseCode) || releaseOrdinal < 1 || !Array.isArray(object.concepts)) invalid();
+
+  const conceptIds = new Set<string>();
+  let previousSortKey: string | null = null;
+  const concepts = object.concepts.map((entry) => {
+    const concept = closedResponseObject(entry, ["conceptId", "canonicalKey", "conceptKind", "displayName", "activeAtRelease"]);
+    const conceptId = uuid(concept.conceptId);
+    const canonicalKey = textValue(concept.canonicalKey);
+    const displayName = textValue(concept.displayName);
+    const conceptKind = enumValue(concept.conceptKind, PROFILE_TAXONOMY_CONCEPT_KINDS) as ProfileTaxonomyConcept["conceptKind"];
+    if (!/^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)+$/.test(canonicalKey) || displayName.trim() === "" || typeof concept.activeAtRelease !== "boolean") invalid();
+    const sortKey = `${canonicalKey}\u0000${conceptId}`;
+    if (conceptIds.has(conceptId) || (previousSortKey !== null && previousSortKey >= sortKey)) invalid();
+    conceptIds.add(conceptId);
+    previousSortKey = sortKey;
+    return Object.freeze({ conceptId, canonicalKey, conceptKind, displayName, activeAtRelease: concept.activeAtRelease });
+  });
+
+  return Object.freeze({
+    schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022",
+    releaseCode,
+    releaseOrdinal,
+    concepts: Object.freeze(concepts),
+  });
+}
+
 export function parseProfileAccount(value: unknown): ProfileAccount {
   const object = closedObject(value, ["schemaVersion", "accountState", "hasCurrentDraft"]);
   if (object.schemaVersion !== "PROFILE_ACCOUNT_V019" || object.accountState !== "ACTIVE" || typeof object.hasCurrentDraft !== "boolean") invalid();
@@ -638,6 +683,15 @@ export function parseCreateDraftRequest(value: unknown): Readonly<{ operationId:
 export function parseProfileIdRequest(value: unknown): Readonly<{ profileVersionId: string }> {
   const object = closedObject(value, ["profileVersionId"]);
   return Object.freeze({ profileVersionId: uuid(object.profileVersionId) });
+}
+
+export function parseTaxonomyRequest(value: unknown): Readonly<{ profileVersionId: string | null }> {
+  const object = closedObject(value, ["profileVersionId"], []);
+  return Object.freeze({
+    profileVersionId: !("profileVersionId" in object) || object.profileVersionId === null
+      ? null
+      : uuid(object.profileVersionId),
+  });
 }
 
 export function parseRevisionRequest(value: unknown): Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }> {
