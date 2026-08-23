@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 
--- Run after Migration 021 on the paired populated Migration 019 fixture.
+-- Run after Migration 020 on the paired populated Migration 019 fixture.
 
 do $assert$
 declare
@@ -28,7 +28,7 @@ begin
 
   perform set_config('request.jwt.claim.sub', v_auth::text, true);
   execute 'set local role authenticated';
-  v_result := public.fork_frozen_profile_to_draft_v021(
+  v_result := public.fork_frozen_profile_to_draft_v020(
     v_source, '97000000-0000-0000-0000-000000000101'
   );
   execute 'reset role';
@@ -42,7 +42,7 @@ begin
          and product_managed and status = 'DRAFT'
          and profile_revision = 0
      ) then
-    raise exception '021 populated upgrade allocated an invalid target';
+    raise exception '020 populated upgrade allocated an invalid target';
   end if;
   select student_degree_id into strict v_target_degree
   from public.student_degrees where profile_version_id = v_target;
@@ -57,7 +57,7 @@ begin
      )
      or (select metadata from public.student_evidence_items
          where profile_version_id = v_target) <> '{}'::jsonb then
-    raise exception '021 populated upgrade did not remap the graph safely';
+    raise exception '020 populated upgrade did not remap the graph safely';
   end if;
 
   select encode(extensions.digest(convert_to(jsonb_build_object(
@@ -67,7 +67,7 @@ begin
     'completeness', (select jsonb_agg(to_jsonb(row_value) order by row_value.completeness_id) from public.student_data_completeness row_value where row_value.profile_version_id = v_source)
   )::text, 'UTF8'), 'sha256'), 'hex') into v_after_hash;
   if v_after_hash <> v_source_hash then
-    raise exception '021 populated upgrade mutated the source graph';
+    raise exception '020 populated upgrade mutated the source graph';
   end if;
 
   execute 'set local role service_role';
@@ -79,7 +79,7 @@ begin
   ) or exists (
     select 1 from public.student_profile_versions where student_id = v_student
   ) then
-    raise exception '021 populated-upgrade cleanup retained student state';
+    raise exception '020 populated-upgrade cleanup retained student state';
   end if;
   delete from auth.users where id = v_auth;
 end;

@@ -1,8 +1,7 @@
 -- Phase 4B-1B.1: owner-scoped Frozen Profile -> new product DRAFT fork.
 --
--- Migration 020 remains reserved for Application/Outcome. This local-only 021
--- must not be deployed before 020 exists and has been applied first; doing so
--- would create a late lower-version migration in Supabase history.
+-- Forward-only Migration 020, additive over local-only Profile Core 019.
+-- Application/Outcome remains planning-only and is reserved for Migration 021.
 
 begin;
 
@@ -13,7 +12,7 @@ alter table private.profile_capability_operations_v019
       'CREATE_OR_RESUME', 'MUTATE', 'FREEZE', 'FORK_FROZEN'
     ));
 
-create or replace function public.fork_frozen_profile_to_draft_v021(
+create or replace function public.fork_frozen_profile_to_draft_v020(
   p_source_profile_version_id uuid,
   p_operation_id uuid
 )
@@ -403,15 +402,15 @@ begin
 
       if v_row.mapping_status = 'REJECTED' then
         perform public.review_student_record_concept_mapping(
-          v_new_id, 'REJECTED', 'PROFILE_FORK_V021', v_new_evidence_id
+          v_new_id, 'REJECTED', 'PROFILE_FORK_V020', v_new_evidence_id
         );
       elsif v_row.mapping_status = 'RETIRED' then
         perform public.review_student_record_concept_mapping(
-          v_new_id, 'VERIFIED', 'PROFILE_FORK_V021', v_new_evidence_id
+          v_new_id, 'VERIFIED', 'PROFILE_FORK_V020', v_new_evidence_id
         );
         perform public.retire_student_record_concept_mapping(
           v_new_id,
-          coalesce(v_row.retirement_reason, 'Recreated by PROFILE_FORK_V021')
+          coalesce(v_row.retirement_reason, 'Recreated by PROFILE_FORK_V020')
         );
       end if;
 
@@ -541,7 +540,7 @@ begin
   end if;
 
   v_result := jsonb_build_object(
-    'schemaVersion', 'PROFILE_OPERATION_RESULT_V021',
+    'schemaVersion', 'PROFILE_OPERATION_RESULT_V020',
     'operation', 'FORK_FROZEN',
     'sourceProfileVersionId', p_source_profile_version_id,
     'profileVersionId', v_new_profile_id,
@@ -558,15 +557,15 @@ end;
 $function$;
 
 grant create on schema public to foundation_student_executor;
-alter function public.fork_frozen_profile_to_draft_v021(uuid,uuid)
+alter function public.fork_frozen_profile_to_draft_v020(uuid,uuid)
   owner to foundation_student_executor;
 revoke create on schema public from foundation_student_executor;
 
-revoke all on function public.fork_frozen_profile_to_draft_v021(uuid,uuid)
+revoke all on function public.fork_frozen_profile_to_draft_v020(uuid,uuid)
   from public, anon, authenticated, service_role, authenticator,
        foundation_catalog_executor, foundation_student_executor,
        foundation_evaluation_executor;
-grant execute on function public.fork_frozen_profile_to_draft_v021(uuid,uuid)
+grant execute on function public.fork_frozen_profile_to_draft_v020(uuid,uuid)
   to authenticated;
 
 insert into public.foundation_function_contracts (
@@ -589,7 +588,7 @@ select namespace.nspname,
 from pg_proc procedure
 join pg_namespace namespace on namespace.oid = procedure.pronamespace
 where namespace.nspname = 'public'
-  and procedure.proname = 'fork_frozen_profile_to_draft_v021'
+  and procedure.proname = 'fork_frozen_profile_to_draft_v020'
 on conflict (schema_name, function_name, identity_arguments) do update
 set owner_role = excluded.owner_role,
     prosecdef = excluded.prosecdef,
@@ -597,7 +596,7 @@ set owner_role = excluded.owner_role,
     allowed_caller_roles = excluded.allowed_caller_roles,
     body_digest = excluded.body_digest;
 
-comment on function public.fork_frozen_profile_to_draft_v021(uuid,uuid) is
+comment on function public.fork_frozen_profile_to_draft_v020(uuid,uuid) is
   'Owner-only atomic FROZEN-to-DRAFT deep fork. All profile-owned identifiers are regenerated and operation_id provides exact replay.';
 
 do $assert$
@@ -612,30 +611,30 @@ begin
   from pg_proc procedure
   join pg_namespace namespace on namespace.oid = procedure.pronamespace
   where namespace.nspname = 'public'
-    and procedure.proname = 'fork_frozen_profile_to_draft_v021';
+    and procedure.proname = 'fork_frozen_profile_to_draft_v020';
 
   if v_function.owner_role <> 'foundation_student_executor'
      or not v_function.prosecdef
      or v_function.proconfig is distinct from
        array['search_path=pg_catalog, public, private, extensions']::text[]
      or v_function.identity_arguments <> 'p_source_profile_version_id uuid, p_operation_id uuid' then
-    raise exception '021 assertion failed: fork function contract';
+    raise exception '020 assertion failed: fork function contract';
   end if;
 
   if not has_function_privilege(
     'authenticated',
-    'public.fork_frozen_profile_to_draft_v021(uuid,uuid)',
+    'public.fork_frozen_profile_to_draft_v020(uuid,uuid)',
     'EXECUTE'
   ) or has_function_privilege(
     'anon',
-    'public.fork_frozen_profile_to_draft_v021(uuid,uuid)',
+    'public.fork_frozen_profile_to_draft_v020(uuid,uuid)',
     'EXECUTE'
   ) or has_function_privilege(
     'service_role',
-    'public.fork_frozen_profile_to_draft_v021(uuid,uuid)',
+    'public.fork_frozen_profile_to_draft_v020(uuid,uuid)',
     'EXECUTE'
   ) then
-    raise exception '021 assertion failed: fork function ACL';
+    raise exception '020 assertion failed: fork function ACL';
   end if;
 
   if exists (
@@ -654,10 +653,10 @@ begin
         'get_profile_document_v019',
         'mutate_profile_draft_v019',
         'freeze_profile_draft_v019',
-        'fork_frozen_profile_to_draft_v021'
+        'fork_frozen_profile_to_draft_v020'
       )
   ) then
-    raise exception '021 assertion failed: authenticated EXECUTE whitelist';
+    raise exception '020 assertion failed: authenticated EXECUTE whitelist';
   end if;
 
   if pg_get_constraintdef(
@@ -667,7 +666,7 @@ begin
           'private.profile_capability_operations_v019'::regclass
           and constraint_value.conname = 'profile_operations_kind_closed')
      ) not like '%FORK_FROZEN%' then
-    raise exception '021 assertion failed: operation kind is not closed';
+    raise exception '020 assertion failed: operation kind is not closed';
   end if;
 end;
 $assert$;

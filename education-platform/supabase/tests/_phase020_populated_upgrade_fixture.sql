@@ -1,12 +1,12 @@
 \set ON_ERROR_STOP on
 
--- Run after Migration 019 and before Migration 021 on a disposable database.
+-- Run after Migration 019 and before Migration 020 on a disposable database.
 -- Commits a populated historical FROZEN graph.
 
 begin;
 insert into auth.users (id, email) values (
   '97000000-0000-0000-0000-000000000001',
-  'phase021-upgrade@test.invalid'
+  'phase020-upgrade@test.invalid'
 );
 select public.create_student('97000000-0000-0000-0000-000000000011');
 insert into private.student_identities (auth_user_id, student_id) values (

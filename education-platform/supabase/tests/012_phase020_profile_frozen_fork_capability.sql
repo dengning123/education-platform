@@ -1,9 +1,9 @@
--- Runs after Migration 021. Test identity 012 remains reserved for the
--- unimplemented Migration 020 Application/Outcome contract.
+-- Runs after Migration 020. Test identity 013 remains reserved for the
+-- unimplemented Migration 021 Application/Outcome contract.
 
 begin;
 
-create or replace function pg_temp.phase021_profile_graph(p_profile_id uuid)
+create or replace function pg_temp.phase020_profile_graph(p_profile_id uuid)
 returns jsonb
 language sql
 stable
@@ -83,22 +83,22 @@ begin
     select 1 from pg_proc procedure
     join pg_namespace namespace on namespace.oid = procedure.pronamespace
     where namespace.nspname = 'public'
-      and procedure.proname = 'fork_frozen_profile_to_draft_v021'
+      and procedure.proname = 'fork_frozen_profile_to_draft_v020'
       and procedure.proowner::regrole::text = 'foundation_student_executor'
       and procedure.prosecdef
       and procedure.proconfig is not distinct from
         array['search_path=pg_catalog, public, private, extensions']::text[]
   ) then
-    raise exception '021 fork function contract is absent';
+    raise exception '020 fork function contract is absent';
   end if;
   if exists (
     select 1 from pg_proc procedure
     join pg_namespace namespace on namespace.oid = procedure.pronamespace
     where namespace.nspname = 'public'
-      and procedure.proname = 'fork_frozen_profile_to_draft_v021'
+      and procedure.proname = 'fork_frozen_profile_to_draft_v020'
       and pg_get_function_identity_arguments(procedure.oid) like '%student_id%'
   ) then
-    raise exception '021 fork accepts caller-supplied student ownership';
+    raise exception '020 fork accepts caller-supplied student ownership';
   end if;
   if has_table_privilege(
     'authenticated', 'public.student_profile_versions', 'INSERT,UPDATE,DELETE'
@@ -106,13 +106,13 @@ begin
     'authenticated', 'private.profile_capability_operations_v019',
     'SELECT,INSERT,UPDATE,DELETE'
   ) then
-    raise exception '021 introduced direct authenticated DML';
+    raise exception '020 introduced direct authenticated DML';
   end if;
 
   v_blocked := false;
   begin
     execute 'set local role anon';
-    perform public.fork_frozen_profile_to_draft_v021(
+    perform public.fork_frozen_profile_to_draft_v020(
       extensions.gen_random_uuid(), extensions.gen_random_uuid()
     );
   exception when insufficient_privilege then
@@ -124,8 +124,8 @@ begin
   end if;
 
   insert into auth.users (id, email) values
-    (v_owner_auth, 'phase021-owner@test.invalid'),
-    (v_other_auth, 'phase021-other@test.invalid');
+    (v_owner_auth, 'phase020-owner@test.invalid'),
+    (v_other_auth, 'phase020-other@test.invalid');
   perform public.create_student(v_owner_student);
   perform public.create_student(v_other_student);
   insert into private.student_identities (auth_user_id, student_id) values
@@ -294,14 +294,14 @@ begin
   end loop;
   perform public.freeze_student_profile_version(v_other_source_id);
 
-  v_source_before := pg_temp.phase021_profile_graph(v_source_id);
+  v_source_before := pg_temp.phase020_profile_graph(v_source_id);
 
   perform set_config('request.jwt.claim.sub', v_owner_auth::text, true);
   execute 'set local role authenticated';
 
   v_blocked := false;
   begin
-    perform public.fork_frozen_profile_to_draft_v021(
+    perform public.fork_frozen_profile_to_draft_v020(
       v_nonfrozen_source_id, extensions.gen_random_uuid()
     );
   exception when object_not_in_prerequisite_state then
@@ -313,7 +313,7 @@ begin
 
   v_blocked := false;
   begin
-    perform public.fork_frozen_profile_to_draft_v021(
+    perform public.fork_frozen_profile_to_draft_v020(
       v_other_source_id, extensions.gen_random_uuid()
     );
   exception when no_data_found then
@@ -323,11 +323,11 @@ begin
     raise exception 'Cross-student source attack was accepted';
   end if;
 
-  v_result := public.fork_frozen_profile_to_draft_v021(
+  v_result := public.fork_frozen_profile_to_draft_v020(
     v_source_id, v_operation_id
   );
   v_new_profile_id := (v_result ->> 'profileVersionId')::uuid;
-  if v_result ->> 'schemaVersion' <> 'PROFILE_OPERATION_RESULT_V021'
+  if v_result ->> 'schemaVersion' <> 'PROFILE_OPERATION_RESULT_V020'
      or v_result ->> 'operation' <> 'FORK_FROZEN'
      or (v_result ->> 'sourceProfileVersionId')::uuid <> v_source_id
      or (v_result ->> 'versionNumber')::integer <> 4
@@ -336,7 +336,7 @@ begin
     raise exception 'Owner fork result is invalid';
   end if;
 
-  v_replay := public.fork_frozen_profile_to_draft_v021(
+  v_replay := public.fork_frozen_profile_to_draft_v020(
     v_source_id, v_operation_id
   );
   if v_replay is distinct from v_result then
@@ -345,7 +345,7 @@ begin
 
   v_blocked := false;
   begin
-    perform public.fork_frozen_profile_to_draft_v021(
+    perform public.fork_frozen_profile_to_draft_v020(
       v_second_source_id, v_operation_id
     );
   exception when unique_violation then
@@ -357,7 +357,7 @@ begin
 
   v_blocked := false;
   begin
-    perform public.fork_frozen_profile_to_draft_v021(
+    perform public.fork_frozen_profile_to_draft_v020(
       v_second_source_id, extensions.gen_random_uuid()
     );
   exception when object_not_in_prerequisite_state then
@@ -372,7 +372,7 @@ begin
   execute 'set local role authenticated';
   v_blocked := false;
   begin
-    perform public.fork_frozen_profile_to_draft_v021(
+    perform public.fork_frozen_profile_to_draft_v020(
       v_source_id, extensions.gen_random_uuid()
     );
   exception when no_data_found then
@@ -484,7 +484,7 @@ begin
       and retired_mapping.student_record_id = v_new_degree_id
       and retired_mapping.student_evidence_id = v_new_evidence_id
       and retired_mapping.mapping_status = 'RETIRED'
-      and retired_mapping.reviewed_by = 'PROFILE_FORK_V021'
+      and retired_mapping.reviewed_by = 'PROFILE_FORK_V020'
       and retired_mapping.reviewed_at is not null
       and retired_mapping.retired_at is not null
   ) then
@@ -536,7 +536,7 @@ begin
   if (v_result ->> 'revision')::bigint <> 1 then
     raise exception 'Forked draft did not use the v019 revision contract';
   end if;
-  v_replay := public.fork_frozen_profile_to_draft_v021(
+  v_replay := public.fork_frozen_profile_to_draft_v020(
     v_source_id, v_operation_id
   );
   execute 'reset role';
@@ -545,7 +545,7 @@ begin
     raise exception 'Fork replay did not preserve the original operation result';
   end if;
 
-  v_source_after := pg_temp.phase021_profile_graph(v_source_id);
+  v_source_after := pg_temp.phase020_profile_graph(v_source_id);
   if v_source_after is distinct from v_source_before then
     raise exception 'Fork or target edit mutated the FROZEN source graph';
   end if;

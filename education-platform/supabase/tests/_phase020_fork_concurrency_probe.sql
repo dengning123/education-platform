@@ -8,7 +8,7 @@ create extension if not exists dblink;
 
 insert into auth.users (id, email) values (
   '96000000-0000-0000-0000-000000000001',
-  'phase021-concurrency@test.invalid'
+  'phase020-concurrency@test.invalid'
 );
 select public.create_student('96000000-0000-0000-0000-000000000011');
 insert into private.student_identities (auth_user_id, student_id) values (
@@ -66,13 +66,13 @@ begin
   perform dblink_exec('p21_same_second', 'set local role authenticated');
 
   perform dblink_send_query('p21_same_first', format(
-    $$select public.fork_frozen_profile_to_draft_v021(
+    $$select public.fork_frozen_profile_to_draft_v020(
       %L,'96000000-0000-0000-0000-000000000101'
     )::text$$, v_source
   ));
   perform pg_sleep(0.1);
   perform dblink_send_query('p21_same_second', format(
-    $$select public.fork_frozen_profile_to_draft_v021(
+    $$select public.fork_frozen_profile_to_draft_v020(
       %L,'96000000-0000-0000-0000-000000000101'
     )::text$$, v_source
   ));
@@ -159,13 +159,13 @@ begin
   perform dblink_exec('p21_diff_second', 'set local role authenticated');
 
   perform dblink_send_query('p21_diff_first', format(
-    $$select public.fork_frozen_profile_to_draft_v021(
+    $$select public.fork_frozen_profile_to_draft_v020(
       %L,'96000000-0000-0000-0000-000000000201'
     )::text$$, v_source
   ));
   perform pg_sleep(0.1);
   perform dblink_send_query('p21_diff_second', format(
-    $$select public.fork_frozen_profile_to_draft_v021(
+    $$select public.fork_frozen_profile_to_draft_v020(
       %L,'96000000-0000-0000-0000-000000000202'
     )::text$$, v_source
   ));
@@ -218,7 +218,7 @@ begin
     select 1 from public.student_profile_versions
     where student_id = '96000000-0000-0000-0000-000000000011'
   ) then
-    raise exception 'Phase 021 concurrency cleanup retained fork state';
+    raise exception 'Phase 020 concurrency cleanup retained fork state';
   end if;
   delete from auth.users
   where id = '96000000-0000-0000-0000-000000000001';

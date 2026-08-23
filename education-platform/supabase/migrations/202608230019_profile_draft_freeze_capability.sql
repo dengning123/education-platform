@@ -1,6 +1,6 @@
 -- Phase 4B-1B.0: authenticated Profile draft/readiness/freeze capability.
 -- Additive over frozen migrations 001-018. Application/Outcome is reserved
--- for Migration 020 and is deliberately absent here.
+-- for Migration 021 and is deliberately absent here.
 
 begin;
 
