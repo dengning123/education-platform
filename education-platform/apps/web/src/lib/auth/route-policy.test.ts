@@ -24,6 +24,8 @@ describe("route policy", () => {
   it("does not treat route visibility as a data permission", () => {
     expect(decideRoute("/", false)).toEqual({ kind: "allow" });
     expect(isProtectedPath("/account/settings")).toBe(true);
+    expect(isProtectedPath("/profile")).toBe(true);
+    expect(isProtectedPath("/profile/history")).toBe(true);
   });
 
   it("rejects external and query-bearing post-sign-in targets", () => {
@@ -31,5 +33,6 @@ describe("route policy", () => {
     expect(safePostSignInPath("//attacker.example/account")).toBe("/account");
     expect(safePostSignInPath("/account?admin=true")).toBe("/account");
     expect(safePostSignInPath(["/account"])).toBe("/account");
+    expect(safePostSignInPath("/profile")).toBe("/profile");
   });
 });

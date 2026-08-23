@@ -34,7 +34,7 @@ describe("frontend source boundary", () => {
     ]);
   });
 
-  it("contains no product-data or Edge Function request path in the 1A source", async () => {
+  it("contains no direct browser PostgREST, table, or Edge Function request path", async () => {
     const files = await sourceFiles(sourceRoot);
     for (const file of files) {
       const content = await readFile(file, "utf8");
@@ -43,9 +43,19 @@ describe("frontend source boundary", () => {
     }
   });
 
-  it("does not add a frontend API route or backend credential adapter", async () => {
+  it("adds only the approved Profile capability route and no privileged adapter", async () => {
     const files = (await sourceFiles(sourceRoot)).map((file) => relative(root, file));
-    expect(files.some((file) => file.startsWith("src/app/api/"))).toBe(false);
+    expect(files.filter((file) => file.startsWith("src/app/api/"))).toEqual([
+      "src/app/api/profile/[capability]/route.ts",
+    ]);
     expect(files.some((file) => /service-role|management-token|database-password/i.test(file))).toBe(false);
+  });
+
+  it("keeps test adapters and production bypasses out of application source", async () => {
+    const files = await sourceFiles(sourceRoot);
+    for (const file of files) {
+      const content = await readFile(file, "utf8");
+      expect(content, relative(root, file)).not.toMatch(/FAKE_SUPABASE|__test__|fixture-bypass/i);
+    }
   });
 });

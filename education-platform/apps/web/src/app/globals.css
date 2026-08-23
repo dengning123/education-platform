@@ -176,11 +176,49 @@ a {
 .auth-card,
 .account-card,
 .boundary-card,
+.profile-connection-card,
 .status-card {
   border: 1px solid rgba(21, 35, 30, 0.12);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow);
+}
+
+.profile-connection-card {
+  padding: clamp(24px, 4vw, 38px);
+  display: grid;
+  gap: 24px;
+}
+
+.profile-connection-card h2 {
+  margin: 8px 0 10px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.75rem;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.profile-connection-result {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+.profile-connection-result p,
+.profile-connection-result small {
+  color: var(--muted);
+}
+
+.account-link {
+  display: inline-grid;
+  place-items: center;
+  width: fit-content;
+  text-decoration: none;
 }
 
 .auth-card {

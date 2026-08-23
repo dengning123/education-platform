@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { SignOutButton } from "@/components/sign-out-button";
 import { getVerifiedUser } from "@/lib/auth/verified-user";
@@ -38,6 +39,10 @@ export default async function AccountPage() {
           Future student-data requests must still pass existing RLS and server-side ownership checks.
         </p>
       </div>
+
+      <Link className="primary-button account-link" href="/profile">
+        Open local Profile connection
+      </Link>
     </section>
   );
 }

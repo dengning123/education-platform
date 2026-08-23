@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const appOrigin = "http://127.0.0.1:3100";
-const authOrigin = "http://127.0.0.1:54321";
+const authOrigin = "http://127.0.0.1:55431";
 const publicKey = "sb_publishable_phase4b1a_browser_test";
 const serviceRoleSentinel = "phase4b1a-service-role-must-stay-server-only";
 const managementSentinel = "phase4b1a-management-token-must-stay-server-only";
@@ -28,6 +28,7 @@ export default defineConfig({
         ...process.env,
         FAKE_SUPABASE_PUBLIC_KEY: publicKey,
         FAKE_SUPABASE_ALLOWED_ORIGIN: appOrigin,
+        FAKE_SUPABASE_PORT: "55431",
       },
     },
     {

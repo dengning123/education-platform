@@ -5,11 +5,12 @@ import { cookies } from "next/headers";
 
 import { getPublicSupabaseConfig } from "@/lib/supabase/config";
 
-export async function createClient() {
+export async function createClient(options: Readonly<{ customFetch?: typeof fetch }> = {}) {
   const cookieStore = await cookies();
   const config = getPublicSupabaseConfig();
 
   return createServerClient(config.url, config.publishableKey, {
+    global: options.customFetch ? { fetch: options.customFetch } : undefined,
     cookies: {
       getAll() {
         return cookieStore.getAll();

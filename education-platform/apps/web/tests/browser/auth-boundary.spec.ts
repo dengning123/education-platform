@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const fakeAuthOrigin = "http://127.0.0.1:54321";
+const fakeAuthOrigin = "http://127.0.0.1:55431";
 const serviceRoleSentinel = "phase4b1a-service-role-must-stay-server-only";
 const managementSentinel = "phase4b1a-management-token-must-stay-server-only";
 
@@ -11,6 +11,17 @@ async function signIn(page: Page, email: string, password: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByTestId("auth-status")).toHaveText("Authenticated");
+}
+
+async function profilePost(page: Page, capability: string, body: unknown) {
+  return page.evaluate(async ({ capability: path, body: payload }) => {
+    const response = await fetch(`/api/profile/${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return { status: response.status, body: await response.json(), requestId: response.headers.get("x-request-id") };
+  }, { capability, body });
 }
 
 test.beforeEach(async ({ request }) => {
@@ -108,4 +119,71 @@ test("dependency auth errors are mapped to a closed public message", async ({ pa
     "We could not sign you in. Check your credentials and try again.",
   );
   await expect(page.getByText("Internal fake dependency detail")).toHaveCount(0);
+});
+
+test("an authenticated Profile shell reaches only the same-origin Next boundary", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await signIn(page, "alice@example.test", "alice-password-1A");
+  await page.goto("/profile");
+  await expect(page.getByTestId("profile-connection-shell")).toBeVisible();
+
+  await page.getByRole("button", { name: "Initialize profile connection" }).click();
+  await expect(page.getByTestId("profile-connection-summary")).toContainText("Profile identity active");
+  await page.getByRole("button", { name: "Create or resume draft" }).click();
+  await expect(page.getByTestId("profile-connection-summary")).toContainText("Draft v1");
+  await page.getByRole("button", { name: "Load current draft" }).click();
+  await expect(page.getByTestId("profile-connection-summary")).toContainText("Current draft v1");
+  await expect(page.getByTestId("profile-request-id")).toContainText("Request ID:");
+
+  expect(requests.some((url) => /\/api\/profile\//.test(url))).toBe(true);
+  expect(requests.some((url) => /\/rest\/v1\/rpc\//.test(url))).toBe(false);
+  expect(requests.some((url) => /\/functions\/v1\//.test(url))).toBe(false);
+});
+
+test("anonymous and expired sessions receive closed Profile access", async ({ page, request }) => {
+  await page.goto("/profile");
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fprofile$/);
+
+  const anonymous = await profilePost(page, "bootstrap", {});
+  expect(anonymous.status).toBe(401);
+  expect(anonymous.body).toMatchObject({ error: "AUTH_REQUIRED" });
+  expect(anonymous.requestId).toBe(anonymous.body.requestId);
+
+  await signIn(page, "alice@example.test", "alice-password-1A");
+  const revoked = await request.post(`${fakeAuthOrigin}/__test__/revoke`, { data: { email: "alice@example.test" } });
+  expect(revoked.ok()).toBe(true);
+  const expired = await profilePost(page, "bootstrap", {});
+  expect(expired.status).toBe(401);
+  expect(expired.body).toEqual(expect.objectContaining({ error: "AUTH_REQUIRED" }));
+});
+
+test("logout closes the protected Profile shell", async ({ page }) => {
+  await signIn(page, "alice@example.test", "alice-password-1A");
+  await page.goto("/profile");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await page.goto("/profile");
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fprofile$/);
+});
+
+test("an unrelated session cannot read another owner's Profile through the Next boundary", async ({ browser }) => {
+  const aliceContext = await browser.newContext();
+  const alice = await aliceContext.newPage();
+  await signIn(alice, "alice@example.test", "alice-password-1A");
+  const created = await profilePost(alice, "draft", { operationId: "00000000-0000-4000-8000-000000000201" });
+  expect(created.status).toBe(200);
+  const aliceProfileId = created.body.data.profileVersionId as string;
+
+  const bobContext = await browser.newContext();
+  const bob = await bobContext.newPage();
+  await signIn(bob, "bob@example.test", "bob-password-1A");
+  const unrelated = await profilePost(bob, "readiness", { profileVersionId: aliceProfileId });
+  expect(unrelated.status).toBe(404);
+  expect(unrelated.body).toEqual(expect.objectContaining({ error: "RESOURCE_NOT_FOUND" }));
+  expect(JSON.stringify(unrelated.body)).not.toContain("Internal fake PostgREST detail");
+  expect(JSON.stringify(unrelated.body)).not.toContain("Internal fake hint");
+
+  await aliceContext.close();
+  await bobContext.close();
 });

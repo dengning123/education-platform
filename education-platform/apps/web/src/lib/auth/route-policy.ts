@@ -4,9 +4,10 @@ export type RouteDecision =
 
 const signInPath = "/sign-in";
 const defaultProtectedPath = "/account";
+const protectedRoots = [defaultProtectedPath, "/profile"] as const;
 
 export function isProtectedPath(pathname: string): boolean {
-  return pathname === defaultProtectedPath || pathname.startsWith(`${defaultProtectedPath}/`);
+  return protectedRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
 }
 
 export function safePostSignInPath(value: string | string[] | undefined): string {
