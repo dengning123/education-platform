@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { ProfileConnectionPanel } from "@/components/profile-connection-panel";
+import { ProfileDraftCore } from "@/components/profile-draft-core";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getVerifiedUser } from "@/lib/auth/verified-user";
 
@@ -14,15 +14,15 @@ export default async function ProfilePage() {
     <section className="account-layout">
       <div className="account-heading">
         <div>
-          <p className="eyebrow">PROFILE CONNECTION</p>
-          <h1>Secure Profile transport</h1>
+          <p className="eyebrow">PROFILE DRAFT</p>
+          <h1>Build what you can support</h1>
           <p className="intro-copy">
-            Local-only connection shell for the owner-scoped Migration 019/020 capabilities.
+            Record sources, education, courses, and explicit completeness declarations without inferred facts or converted grades.
           </p>
         </div>
         <SignOutButton />
       </div>
-      <ProfileConnectionPanel />
+      <ProfileDraftCore />
     </section>
   );
 }

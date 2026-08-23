@@ -39,24 +39,63 @@ function profileState(user) {
   return state;
 }
 
-function readiness() {
+function newDraft(versionNumber) {
+  return {
+    id: nextId(),
+    versionNumber,
+    status: "DRAFT",
+    revision: 0,
+    evidenceItems: [],
+    degrees: [],
+    courses: [],
+    testScores: [],
+    experiences: [],
+    skills: [],
+    experienceSkills: [],
+    goals: [],
+    preferences: [],
+    mappings: [],
+    completeness: new Map(),
+  };
+}
+
+function completenessKey(educationContextId, domain) {
+  return `${educationContextId ?? "GLOBAL"}:${domain}`;
+}
+
+function readiness(profile) {
+  const required = [
+    { educationContextId: null, domain: "EDUCATION_HISTORY" },
+    { educationContextId: null, domain: "TEST_HISTORY" },
+    { educationContextId: null, domain: "EXPERIENCE_HISTORY" },
+    { educationContextId: null, domain: "SKILL_HISTORY" },
+    { educationContextId: null, domain: "PREFERENCES" },
+    { educationContextId: null, domain: "GOALS" },
+  ];
+  const courseContexts = profile.degrees.length === 0 ? [null] : profile.degrees.map((degree) => degree.degreeId);
+  for (const educationContextId of courseContexts) {
+    required.push({ educationContextId, domain: "COURSE_HISTORY" });
+    required.push({ educationContextId, domain: "COURSE_MAPPING" });
+  }
+  const declarations = [];
+  const missingDeclarations = [];
+  for (const scope of required) {
+    const declaration = profile.completeness.get(completenessKey(scope.educationContextId, scope.domain));
+    if (declaration) declarations.push(declaration);
+    else missingDeclarations.push(scope);
+  }
+  const mappingReadiness = [
+    ...profile.degrees.map((degree) => ({ recordType: "DEGREE", recordId: degree.degreeId, verified: false, mappingStatuses: [] })),
+    ...profile.courses.map((course) => ({ recordType: "COURSE", recordId: course.courseId, verified: false, mappingStatuses: [] })),
+  ];
   return {
     schemaVersion: "PROFILE_READINESS_V019",
-    freezeReady: false,
-    requiredScopeCount: 8,
-    declaredRequiredScopeCount: 0,
-    missingDeclarations: [
-      { educationContextId: null, domain: "EDUCATION_HISTORY" },
-      { educationContextId: null, domain: "COURSE_HISTORY" },
-      { educationContextId: null, domain: "COURSE_MAPPING" },
-      { educationContextId: null, domain: "TEST_HISTORY" },
-      { educationContextId: null, domain: "EXPERIENCE_HISTORY" },
-      { educationContextId: null, domain: "SKILL_HISTORY" },
-      { educationContextId: null, domain: "PREFERENCES" },
-      { educationContextId: null, domain: "GOALS" },
-    ],
-    declarations: [],
-    mappingReadiness: [],
+    freezeReady: missingDeclarations.length === 0,
+    requiredScopeCount: required.length,
+    declaredRequiredScopeCount: declarations.length,
+    missingDeclarations,
+    declarations,
+    mappingReadiness,
   };
 }
 
@@ -69,18 +108,91 @@ function profileDocument(profile) {
     revision: profile.revision,
     snapshotHash: profile.status === "FROZEN" ? "a".repeat(64) : null,
     frozenAt: profile.status === "FROZEN" ? now : null,
-    readiness: readiness(),
-    evidenceItems: [],
-    degrees: [],
-    courses: [],
-    testScores: [],
-    experiences: [],
-    skills: [],
-    experienceSkills: [],
-    goals: [],
-    preferences: [],
-    mappings: [],
+    readiness: readiness(profile),
+    evidenceItems: profile.evidenceItems,
+    degrees: profile.degrees,
+    courses: profile.courses,
+    testScores: profile.testScores,
+    experiences: profile.experiences,
+    skills: profile.skills,
+    experienceSkills: profile.experienceSkills,
+    goals: profile.goals,
+    preferences: profile.preferences,
+    mappings: profile.mappings,
   };
+}
+
+function replaceById(records, idKey, id, replacement) {
+  const index = records.findIndex((record) => record[idKey] === id);
+  if (index < 0) return false;
+  records[index] = replacement;
+  return true;
+}
+
+function removeById(records, idKey, id) {
+  const index = records.findIndex((record) => record[idKey] === id);
+  if (index < 0) return false;
+  records.splice(index, 1);
+  return true;
+}
+
+function applyProfileMutation(profile, command, payload) {
+  if (command === "EVIDENCE_CREATE") {
+    const evidenceId = nextId();
+    profile.evidenceItems.push({ evidenceId, evidenceType: payload.evidenceType, locator: payload.locator ?? null, contentHash: payload.contentHash ?? null, observedAt: payload.observedAt ?? now });
+    return evidenceId;
+  }
+  if (command === "EVIDENCE_UPDATE") {
+    const replacement = { evidenceId: payload.evidenceId, evidenceType: payload.evidenceType, locator: payload.locator ?? null, contentHash: payload.contentHash ?? null, observedAt: payload.observedAt ?? now };
+    return replaceById(profile.evidenceItems, "evidenceId", payload.evidenceId, replacement) ? payload.evidenceId : null;
+  }
+  if (command === "EVIDENCE_DELETE") {
+    const inUse = [...profile.degrees, ...profile.courses, ...profile.testScores, ...profile.experiences, ...profile.skills, ...profile.mappings].some((record) => record.evidenceId === payload.evidenceId);
+    if (inUse) return "PROFILE_EVIDENCE_IN_USE";
+    return removeById(profile.evidenceItems, "evidenceId", payload.evidenceId) ? payload.evidenceId : null;
+  }
+  if (command === "DEGREE_CREATE") {
+    const degreeId = nextId();
+    profile.degrees.push({ degreeId, ...payload });
+    return degreeId;
+  }
+  if (command === "DEGREE_UPDATE") {
+    const replacement = { ...payload };
+    return replaceById(profile.degrees, "degreeId", payload.degreeId, replacement) ? payload.degreeId : null;
+  }
+  if (command === "DEGREE_DELETE") {
+    profile.courses = profile.courses.filter((course) => course.degreeId !== payload.degreeId);
+    for (const key of [...profile.completeness.keys()]) {
+      if (key.startsWith(`${payload.degreeId}:`)) profile.completeness.delete(key);
+    }
+    return removeById(profile.degrees, "degreeId", payload.degreeId) ? payload.degreeId : null;
+  }
+  if (command === "COURSE_CREATE") {
+    const courseId = nextId();
+    profile.courses.push({ courseId, ...payload });
+    return courseId;
+  }
+  if (command === "COURSE_UPDATE") {
+    const replacement = { ...payload };
+    return replaceById(profile.courses, "courseId", payload.courseId, replacement) ? payload.courseId : null;
+  }
+  if (command === "COURSE_DELETE") {
+    return removeById(profile.courses, "courseId", payload.courseId) ? payload.courseId : null;
+  }
+  if (command === "COMPLETENESS_UPSERT") {
+    const key = completenessKey(payload.educationContextId ?? null, payload.domain);
+    const current = profile.completeness.get(key);
+    const completenessId = current?.completenessId ?? nextId();
+    profile.completeness.set(key, { completenessId, educationContextId: payload.educationContextId ?? null, domain: payload.domain, completeness: payload.completeness, explanation: payload.completeness === "COMPLETE" ? null : payload.explanation });
+    return completenessId;
+  }
+  if (command === "COMPLETENESS_DELETE") {
+    const key = completenessKey(payload.educationContextId ?? null, payload.domain);
+    const current = profile.completeness.get(key);
+    profile.completeness.delete(key);
+    return current?.completenessId ?? null;
+  }
+  return null;
 }
 
 function rpcError(response, status, message, code = "P0001") {
@@ -207,6 +319,15 @@ const server = createServer(async (request, response) => {
     send(response, 200, { ok: true });
     return;
   }
+  if (url.pathname === "/__test__/bump-profile-revision" && request.method === "POST") {
+    const body = await jsonBody(request);
+    const user = users.get(String(body.email ?? "").toLowerCase());
+    const state = user ? profileState(user) : null;
+    if (!state?.draft) return send(response, 404, { ok: false });
+    state.draft.revision += 1;
+    send(response, 200, { ok: true, revision: state.draft.revision });
+    return;
+  }
 
   if (request.headers.apikey !== publicKey) {
     send(response, 401, { message: "Public key required" });
@@ -278,7 +399,7 @@ const server = createServer(async (request, response) => {
       if (replay === "CONFLICT") return rpcError(response, 409, "PROFILE_OPERATION_CONFLICT", "23505");
       if (replay) return send(response, 200, replay);
       if (!state.draft) {
-        state.draft = { id: nextId(), versionNumber: state.frozen.size + 1, status: "DRAFT", revision: 0 };
+        state.draft = newDraft(state.frozen.size + 1);
       }
       const result = { schemaVersion: "PROFILE_OPERATION_RESULT_V019", operation: "CREATE_OR_RESUME", profileVersionId: state.draft.id, versionNumber: state.draft.versionNumber, status: "DRAFT", revision: state.draft.revision };
       state.operations.set(operationId, { fingerprint, result });
@@ -298,7 +419,7 @@ const server = createServer(async (request, response) => {
       const requested = body.p_profile_version_id;
       const profile = state.draft?.id === requested ? state.draft : state.frozen.get(requested);
       if (!profile) return rpcError(response, 404, "PROFILE_NOT_FOUND", "P0002");
-      send(response, 200, readiness());
+      send(response, 200, readiness(profile));
       return;
     }
 
@@ -310,8 +431,11 @@ const server = createServer(async (request, response) => {
       if (replay === "CONFLICT") return rpcError(response, 409, "PROFILE_OPERATION_CONFLICT", "23505");
       if (replay) return send(response, 200, replay);
       if (state.draft.revision !== body.p_expected_revision) return rpcError(response, 409, "PROFILE_REVISION_CONFLICT", "40001");
+      const resourceId = applyProfileMutation(state.draft, body.p_command, body.p_payload ?? {});
+      if (resourceId === "PROFILE_EVIDENCE_IN_USE") return rpcError(response, 409, resourceId, "55000");
+      if (resourceId === null && !["EXPERIENCE_SKILL_LINK", "EXPERIENCE_SKILL_UNLINK"].includes(body.p_command)) return rpcError(response, 404, "PROFILE_CHILD_NOT_FOUND", "P0002");
       state.draft.revision += 1;
-      const result = { schemaVersion: "PROFILE_OPERATION_RESULT_V019", operation: "MUTATE", command: body.p_command, profileVersionId: state.draft.id, revision: state.draft.revision, resourceId: null, resourceKey: null };
+      const result = { schemaVersion: "PROFILE_OPERATION_RESULT_V019", operation: "MUTATE", command: body.p_command, profileVersionId: state.draft.id, revision: state.draft.revision, resourceId, resourceKey: null };
       state.operations.set(operationId, { fingerprint, result });
       send(response, 200, result);
       return;
@@ -345,7 +469,7 @@ const server = createServer(async (request, response) => {
       if (replay === "CONFLICT") return rpcError(response, 409, "PROFILE_OPERATION_CONFLICT", "23505");
       if (replay) return send(response, 200, replay);
       if (state.draft) return rpcError(response, 409, "PROFILE_ACTIVE_DRAFT_EXISTS", "55000");
-      state.draft = { id: nextId(), versionNumber: source.versionNumber + 1, status: "DRAFT", revision: 0 };
+      state.draft = newDraft(source.versionNumber + 1);
       const result = { schemaVersion: "PROFILE_OPERATION_RESULT_V020", operation: "FORK_FROZEN", sourceProfileVersionId: source.id, profileVersionId: state.draft.id, versionNumber: state.draft.versionNumber, status: "DRAFT", revision: 0 };
       state.operations.set(operationId, { fingerprint, result });
       send(response, 200, result);

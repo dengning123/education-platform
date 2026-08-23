@@ -121,20 +121,15 @@ test("dependency auth errors are mapped to a closed public message", async ({ pa
   await expect(page.getByText("Internal fake dependency detail")).toHaveCount(0);
 });
 
-test("an authenticated Profile shell reaches only the same-origin Next boundary", async ({ page }) => {
+test("an authenticated Profile draft reaches only the same-origin Next boundary", async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
   await signIn(page, "alice@example.test", "alice-password-1A");
   await page.goto("/profile");
-  await expect(page.getByTestId("profile-connection-shell")).toBeVisible();
-
-  await page.getByRole("button", { name: "Initialize profile connection" }).click();
-  await expect(page.getByTestId("profile-connection-summary")).toContainText("Profile identity active");
-  await page.getByRole("button", { name: "Create or resume draft" }).click();
-  await expect(page.getByTestId("profile-connection-summary")).toContainText("Draft v1");
-  await page.getByRole("button", { name: "Load current draft" }).click();
-  await expect(page.getByTestId("profile-connection-summary")).toContainText("Current draft v1");
-  await expect(page.getByTestId("profile-request-id")).toContainText("Request ID:");
+  await expect(page.getByTestId("profile-draft-empty")).toBeVisible();
+  await page.getByRole("button", { name: "Start Profile draft" }).click();
+  await expect(page.getByTestId("profile-draft-core")).toBeVisible();
+  await expect(page.getByTestId("profile-live-status")).toContainText("Request ID:");
 
   expect(requests.some((url) => /\/api\/profile\//.test(url))).toBe(true);
   expect(requests.some((url) => /\/rest\/v1\/rpc\//.test(url))).toBe(false);

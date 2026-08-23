@@ -17,7 +17,7 @@ export default async function AccountPage() {
           <p className="eyebrow">ACCOUNT STATE</p>
           <h1>Session verified</h1>
           <p className="intro-copy">
-            Your identity is active. Product data flows are intentionally unavailable in Phase 4B-1A.
+            Your identity is active. The local Profile Draft Core is available through the existing owner-scoped server boundary.
           </p>
         </div>
         <span className="status-badge" data-testid="auth-status">Authenticated</span>
@@ -41,7 +41,7 @@ export default async function AccountPage() {
       </div>
 
       <Link className="primary-button account-link" href="/profile">
-        Open local Profile connection
+        Open Profile draft
       </Link>
     </section>
   );
