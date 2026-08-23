@@ -1,6 +1,7 @@
 # Phase 4 Production Observability and Minimum Product Loop Plan
 
-Status: **PHASE 4A-1 DEPLOYED AND VERIFIED — REMAINDER PLANNING ONLY**
+Status: **PHASE 4A-1 FINAL FREEZE — PHASE 4A-2 READINESS FINDINGS ONLY,
+AUTOMATION NOT AUTHORIZED**
 
 Date: 2026-08-22
 
@@ -42,11 +43,11 @@ confirmed operational hardening work that must precede browser rollout:
 
 These findings do not change the Phase 3 semantic result contract. Phase 4A-1
 closed the shared request ID, CORS, content-type/body-size, error-redaction,
-and release-identity boundary and re-ran the established remote smoke. A hard
-application deadline is intentionally deferred because the frozen Fit runtime
-cannot cancel in-flight database work; returning a timeout while a finalizer
-may still commit would make retries unsafe. Its final disposition is recorded
-in
+release-identity, and cooperative deadline boundaries and re-ran the
+established remote smoke. The request and dependency deadlines propagate an
+abort signal into the actual database network request; the wrapper does not
+race the whole handler and return while an uncancelled finalizer continues.
+Their exact disposition is recorded in
 [`PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md`](PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md).
 
 ## 2. Frozen semantic boundaries
@@ -93,10 +94,13 @@ receipt or trace table requires a separate additive migration after 019.
 #### Phase 4A-1 bounded implementation increment
 
 **Completion:** separately authorized, implemented, deployed, and remotely
-verified at source build
-`099a348e6b2ea9dc757efa2faacc675ba673ad5d`. The final release/document
-baseline is `27d58545c5573f92051a31071bf345bf4d2446e2`. No further Phase 4
-increment is authorized by that completion.
+verified at code build
+`099a348e6b2ea9dc757efa2faacc675ba673ad5d`. The implementation
+release-record baseline remains
+`27d58545c5573f92051a31071bf345bf4d2446e2`; the final Phase 4A-1 release
+baseline is the docs-only commit named by annotated tag
+`phase4a1-edge-http-v1-final`. No further Phase 4 increment is authorized by
+that completion or freeze.
 
 The completed first mutation set was limited to:
 
@@ -163,20 +167,42 @@ global operational log stream.
 
 ### 3.2 Metrics, dashboards, and alerts
 
+The executable-source/capability review and the refined metric, alert,
+retention/access, canary, and rollback contract are recorded in
+[`PHASE_4A2_OBSERVABILITY_CANARY_PLAN.md`](PHASE_4A2_OBSERVABILITY_CANARY_PLAN.md).
+The subsequent authenticated, GET-only plan/RBAC/field discovery and manual
+historical canary are recorded in
+[`PHASE_4A21_NATIVE_READ_ONLY_CANARY_REVIEW.md`](PHASE_4A21_NATIVE_READ_ONLY_CANARY_REVIEW.md).
+The review confirmed a Free plan, one-day native log retention, no narrow
+read-only role, four ACTIVE version-9 functions, and 40/40 application events
+matching the frozen release/event contract. These records distinguish signals
+available from the current closed Edge event, count-only database gauges, and
+signals that do not yet have a truthful source. They do not authorize a
+dashboard, scheduled query, alert, synthetic request, deployment, log drain,
+or migration.
+
+Free-plan logging/Metrics limits, missing warm-latency evidence, monitoring
+role limitations, synthetic-canary prerequisites, and dashboard/alert gaps
+are Phase 4A-2 readiness findings only. They do not block or reopen the Phase
+4A-1 freeze and are not addressed by its final docs-only commit.
+
 Initial dashboards must expose aggregates only:
 
 - request count, success rate, and latency percentiles by endpoint/release;
 - 401, 403/404, 409, 422, and 5xx counts by stable error code;
 - Fit evaluations started, completed, failed closed, and left `BUILDING`;
-- Financial normalizations prepared, verified, rejected, resumed, and left
-  `DRAFT`;
-- privacy deletion attempts, successes, and integrity failures;
+- Financial normalizations prepared, verified, retired, resumed at the Edge
+  endpoint, and left `DRAFT`; review-request rejection is not a persisted
+  Financial lifecycle state;
+- committed privacy-deletion tombstones; attempts and integrity failures only
+  after a separately authorized privacy-safe operational source exists;
 - deployment version skew between the four Edge Functions;
 - database connection/RPC failure rate and retry behavior.
 
 Immediate paging conditions:
 
-- any privacy-deletion integrity failure;
+- any privacy-deletion integrity failure, once a truthful privacy-safe source
+  exists (not executable from the current event/schema);
 - any deployed function missing its expected build identity;
 - sustained 5xx rate above 1% with at least five requests in five minutes;
 - a release producing three consecutive internal failures during canary smoke;
@@ -186,7 +212,8 @@ Operational review conditions:
 
 - a `BUILDING` evaluation older than 15 minutes;
 - a Financial normalization left `DRAFT` for more than 72 hours;
-- repeated authorization failures from one runtime/client class;
+- repeated authorization failures by a future approved bounded client-class
+  enum; no current user/IP/token-derived grouping is permitted;
 - p95 latency regression greater than 50% against the preceding verified
   release baseline.
 
@@ -196,8 +223,10 @@ caller-caused 4xx responses and planned maintenance.
 
 ### 3.3 Retention and access
 
-- raw runtime events: shortest operationally useful retention, initially no
-  more than 14 days;
+- raw runtime events: shortest operationally useful retention, with 14 days as
+  the policy ceiling only if the active hosted plan exposes a compatible
+  control; otherwise the plan-controlled retention is an explicit privacy
+  review gate and must not be described as configured;
 - aggregated metrics: may be retained longer only when they contain no stable
   user or object identifier;
 - production log access: restricted to the operations role and audited;

@@ -1,11 +1,20 @@
 # Phase 4A-1 Edge HTTP Boundary Release
 
-Status: **IMPLEMENTED, DEPLOYED, AND REMOTELY VERIFIED WITH ONE EXTERNAL
-GATEWAY FINDING**
+Status: **FINAL PHASE 4A-1 FREEZE APPROVED — IMPLEMENTED, DEPLOYED, AND
+REMOTELY VERIFIED WITH ONE DOCUMENTED PLATFORM EXCEPTION**
 
 Date: 2026-08-22
 
-Source build: `099a348e6b2ea9dc757efa2faacc675ba673ad5d`
+Code build identity: `099a348e6b2ea9dc757efa2faacc675ba673ad5d`
+
+Implementation release-record baseline:
+`27d58545c5573f92051a31071bf345bf4d2446e2`
+
+Final docs-only freeze tag: `phase4a1-edge-http-v1-final`
+
+The final tag resolves to the docs-only freeze commit. It does not replace or
+reinterpret either the code build identity or the implementation
+release-record baseline.
 
 Phase 3 semantic baseline: tag `phase3-fit-v0.1`, commit
 `55296e1aeca9a25b066e9010c376f0e618af59d1`
@@ -177,7 +186,39 @@ or adding an outer proxy. Neither was authorized, so JWT verification remains
 enabled and this was not changed. The shared closed-envelope contract applies
 to requests admitted to the function.
 
-Phase 4A-1 is complete within its authorized application boundary. No
-dashboard, monitoring vendor, durable trace/audit table, metrics warehouse,
-general tracing framework, UI, Migration 019, Competitiveness implementation,
-or Phase 4A-2 work was started.
+Phase 4A-1 is complete within its authorized application boundary. A later
+GET-only native-observability readiness review confirmed the current hosted
+plan/RBAC/log shape without changing code, deployment, configuration, data, or
+traffic. Its Free-plan log retention and Metrics limitations, absence of a
+narrow monitoring role, lack of warm-latency evidence, synthetic-canary
+authorization boundary, and dashboard/alert limitations are exclusively
+Phase 4A-2 readiness findings. They are not Phase 4A-1 freeze blockers, do not
+reopen this release, and are not resolved by this freeze.
+
+No dashboard, alert, scheduled reader, monitoring vendor, durable trace/audit
+table, metrics warehouse, generalized tracing framework, synthetic traffic,
+UI, Migration 019, or Competitiveness implementation is authorized or started
+by this final freeze.
+
+## 7. Final freeze verification
+
+The final freeze-only audit reconfirmed:
+
+- migrations `001`–`018` have no working-tree or post-Phase-3 byte drift;
+- the recorded hashes for migrations `012`–`018` and the Migration 018 SQL
+  test match exactly;
+- the Fit Engine source hash remains
+  `e32a3ed849633a216e84dd23afae5bd60f261333c55e4c5a3c0841f6b795564e`;
+- the frozen runtime SHA-256 remains
+  `0c6344b98b93ea38282236ac437bd8bc71eec3804bc103d7b09ad6ef790fd5b1`;
+- Eligibility/Fit semantic packages, the controlled adapter at the Phase 4A-1
+  code build, evaluator registration, and fingerprint identities have no
+  drift;
+- all four deployed functions remain ACTIVE at version 9 with
+  `verify_jwt=true`;
+- the freeze commit contains documentation only and preserves all code,
+  migration, runtime, semantic, evaluator, fingerprint, response, and remote
+  configuration identities.
+
+**PHASE 4A-1 FROZEN — CODE BUILD AND IMPLEMENTATION RELEASE RECORD
+PRESERVED.**
