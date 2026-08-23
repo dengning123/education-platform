@@ -1,5 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
+import { PROFILE_RECOVERY_CONTEXT_KEY, PROFILE_RECOVERY_STORE_KEY } from "../../src/lib/profile/profile-recovery";
+
 const fakeAuthOrigin = "http://127.0.0.1:55431";
 
 async function signIn(page: Page) {
@@ -97,6 +99,15 @@ test("student completes the narrow source, education, course, declaration, and i
   await expect(page.getByRole("heading", { name: "Frozen v1" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Edit|Add|Save/ })).toHaveCount(0);
   await expect(page.getByText(/Historical frozen-version discovery is not available/)).toBeVisible();
+  expect(await page.evaluate(([storeKey, contextKey]) => ({
+    store: window.sessionStorage.getItem(storeKey),
+    context: window.sessionStorage.getItem(contextKey),
+  }), [PROFILE_RECOVERY_STORE_KEY, PROFILE_RECOVERY_CONTEXT_KEY])).toEqual({ store: null, context: null });
+  expect(await page.evaluate(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  })).toBe(false);
 
   const profileApiBodies = browserRequests.filter((entry) => /\/api\/profile\//.test(entry.url)).map((entry) => entry.body ?? "");
   expect(profileApiBodies.some((body) => body.includes('"command":"DEGREE_CREATE"'))).toBe(true);

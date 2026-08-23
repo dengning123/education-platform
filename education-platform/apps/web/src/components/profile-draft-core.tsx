@@ -11,6 +11,11 @@ import {
   useState,
 } from "react";
 
+import {
+  RecoveryPrompt,
+  useProfileDirtyRegistration,
+  useProfileSafety,
+} from "@/components/profile-safety-provider";
 import { newProfileOperationId, postProfileRequest } from "@/lib/profile/client";
 import {
   PROFILE_COMPLETENESS_VALUES,
@@ -48,6 +53,16 @@ import {
   type ProfileDraftSection,
   type ProfileEvidenceItem,
 } from "@/lib/profile/draft-core";
+import {
+  clearAllProfileRecovery,
+  ensureProfileRecoveryContext,
+  type CompletenessRecoveryPayload,
+  type CourseRecoveryPayload,
+  type EducationRecoveryPayload,
+} from "@/lib/profile/profile-recovery";
+import { isProfileFormDirty } from "@/lib/profile/product-safety";
+import { PROFILE_SEMANTIC_COPY } from "@/lib/profile/semantic-copy";
+import { useProfileLocalRecovery } from "@/lib/profile/use-profile-recovery";
 
 type UiPhase = "loading" | "empty" | "ready" | "frozen" | "error";
 type NoticeTone = "neutral" | "success" | "warning" | "error";
@@ -119,7 +134,7 @@ function reducer(state: UiState, action: UiAction): UiState {
     case "SECTION":
       return { ...state, section: action.section, noticeTone: state.noticeTone === "error" ? "neutral" : state.noticeTone };
     case "CONFLICT":
-      return { ...state, phase: "ready", document: action.document, pending: false, notice: "This Profile was updated in another page or operation. Review the latest version before saving again.", noticeTone: "warning", requestId: action.requestId, revisionConflict: action.conflict, exactRetry: null };
+      return { ...state, phase: "ready", document: action.document, pending: false, notice: PROFILE_SEMANTIC_COPY.conflict.revisionNotice, noticeTone: "warning", requestId: action.requestId, revisionConflict: action.conflict, exactRetry: null };
     case "CLEAR_ISSUE":
       return { ...state, revisionConflict: null, exactRetry: null, notice: "The latest authoritative Profile is displayed.", noticeTone: "neutral" };
   }
@@ -245,12 +260,21 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: Re
 type Mutate = <Command extends ProfileCommand>(command: Command, payload: ProfileCommandPayloads[Command], description: string) => Promise<boolean>;
 
 export function ProfileDraftCore() {
+  const profileSafety = useProfileSafety();
   const [state, dispatch] = useReducer(reducer, initialState);
   const mutationLock = useRef(false);
   const documentRef = useRef<ProfileDocument | null>(null);
 
   useEffect(() => {
     documentRef.current = state.document;
+  }, [state.document]);
+
+  useEffect(() => {
+    if (!state.document || state.document.status !== "DRAFT") return;
+    void ensureProfileRecoveryContext(window.sessionStorage, {
+      profileVersionId: state.document.profileVersionId,
+      versionNumber: state.document.versionNumber,
+    });
   }, [state.document]);
 
   const readDocument = useCallback(async (successNotice: string): Promise<ProfileDocument | null> => {
@@ -329,7 +353,7 @@ export function ProfileDraftCore() {
       if (result.error === "PROFILE_REVISION_CONFLICT") {
         await refreshAfterConflict(conflict, result.requestId);
       } else if (result.error === "PROFILE_OPERATION_CONFLICT") {
-        await readDocument("The operation identifier was already used for different content. Your changes were not applied; the authoritative Profile has been reloaded.");
+        await readDocument(PROFILE_SEMANTIC_COPY.conflict.operationNotice);
       } else {
         dispatch({
           type: "FAIL",
@@ -422,6 +446,7 @@ export function ProfileDraftCore() {
       const operation = parseProfileOperationResult(result.data);
       if (operation.operation !== "FREEZE") throw new TypeError("INVALID_FREEZE_RESULT");
       const document = parseProfileDocument(operation.document);
+      clearAllProfileRecovery(window.sessionStorage);
       dispatch({ type: "FROZEN", document, notice: "Immutable Profile version created.", requestId: result.requestId });
       return true;
     } catch {
@@ -445,7 +470,9 @@ export function ProfileDraftCore() {
     }
   }
 
-  function changeSection(section: ProfileDraftSection) {
+  async function changeSection(section: ProfileDraftSection) {
+    if (section === state.section) return;
+    if (!await profileSafety.requestDiscard({ message: PROFILE_SEMANTIC_COPY.unsaved.section })) return;
     dispatch({ type: "SECTION", section });
     window.requestAnimationFrame(() => document.getElementById("profile-section-heading")?.focus());
   }
@@ -499,15 +526,15 @@ export function ProfileDraftCore() {
               type="button"
               key={section}
               aria-current={state.section === section ? "page" : undefined}
-              onClick={() => changeSection(section)}
+              onClick={() => void changeSection(section)}
             >
               {sectionLabels[section]}
             </button>
           ))}
         </nav>
         <div className="profile-mvp-note">
-          <strong>Not available in this MVP</strong>
-          <span>Tests · Experience · Skills · Goals · Preferences</span>
+          <strong>{PROFILE_SEMANTIC_COPY.unsupported.heading}</strong>
+          <span>{PROFILE_SEMANTIC_COPY.unsupported.sections}</span>
         </div>
       </aside>
 
@@ -515,8 +542,8 @@ export function ProfileDraftCore() {
         <ProfileLiveStatus state={state} />
         {state.revisionConflict ? (
           <div className="profile-conflict-card" role="alert">
-            <strong>Review the latest version before saving again.</strong>
-            <p>Your unsaved form values are still present. Confirm only after comparing them with the reloaded Profile.</p>
+            <strong>{PROFILE_SEMANTIC_COPY.conflict.revisionTitle}</strong>
+            <p>{PROFILE_SEMANTIC_COPY.conflict.revisionBody}</p>
             <div className="profile-inline-actions">
               <button className="primary-button" type="button" disabled={state.pending} onClick={() => void confirmRevisionRetry()}>Confirm against revision {state.document.revision}</button>
               <button className="secondary-button" type="button" onClick={() => dispatch({ type: "CLEAR_ISSUE" })}>Keep reviewing</button>
@@ -525,13 +552,13 @@ export function ProfileDraftCore() {
         ) : null}
         {state.exactRetry ? (
           <div className="profile-conflict-card" role="alert">
-            <strong>The outcome may be ambiguous.</strong>
-            <p>The database operation may have continued. Retry sends the exact same operation identifier, revision, command, and payload.</p>
+            <strong>{PROFILE_SEMANTIC_COPY.conflict.timeoutTitle}</strong>
+            <p>{PROFILE_SEMANTIC_COPY.conflict.timeoutBody}</p>
             <button className="secondary-button" type="button" disabled={state.pending} onClick={() => void retryExactRequest()}>Retry exact request</button>
           </div>
         ) : null}
 
-        {state.section === "overview" ? <OverviewSection document={state.document} onNavigate={changeSection} /> : null}
+        {state.section === "overview" ? <OverviewSection document={state.document} onNavigate={(section) => void changeSection(section)} /> : null}
         {state.section === "sources" ? <SourcesSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
         {state.section === "education" ? <EducationSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
         {state.section === "courses" ? <CoursesSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
@@ -589,13 +616,13 @@ function OverviewSection({ document, onNavigate }: Readonly<{ document: ProfileD
         <article className="profile-section-card">
           <h3>Authoritative completeness</h3>
           <p>{missing} missing · {partial} partial · {unknown} unknown</p>
-          <p className="profile-card-note">PARTIAL and UNKNOWN are legitimate declarations. Only a missing required declaration directly prevents freeze.</p>
+          <p className="profile-card-note">PARTIAL and UNKNOWN are legitimate declarations. {PROFILE_SEMANTIC_COPY.completeness.law}</p>
           <button className="secondary-button" type="button" onClick={() => onNavigate("completeness")}>Review declarations</button>
         </article>
         <article className="profile-section-card">
           <h3>Mapping readiness</h3>
           <p>{document.readiness.mappingReadiness.filter((item) => item.verified).length} records have a VERIFIED mapping state.</p>
-          <p className="profile-card-note">Mapping readiness is separate from completeness and cannot be changed here.</p>
+          <p className="profile-card-note">{PROFILE_SEMANTIC_COPY.mapping.readiness}</p>
           <button className="secondary-button" type="button" onClick={() => onNavigate("review")}>Review Profile</button>
         </article>
       </div>
@@ -622,7 +649,7 @@ function SourcesSection({ document, mutate, pending }: Readonly<{ document: Prof
 
   return (
     <section>
-      <SectionHeading eyebrow="SOURCES" title="Where your information comes from" description="A source records provenance. It is not proof that information was externally reviewed or confirmed." />
+      <SectionHeading eyebrow="SOURCES" title="Where your information comes from" description={PROFILE_SEMANTIC_COPY.source.provenance} />
       <div className="profile-section-toolbar">
         <p>{items.length} source record{items.length === 1 ? "" : "s"}</p>
         <button className="primary-button" type="button" disabled={pending} onClick={() => { setEditing(null); setShowForm(true); }}>Add source</button>
@@ -654,13 +681,31 @@ function SourcesSection({ document, mutate, pending }: Readonly<{ document: Prof
 }
 
 function SourceForm({ item, mutate, pending, onClose }: Readonly<{ item: ProfileEvidenceItem | null; mutate: Mutate; pending: boolean; onClose(): void }>) {
+  const safety = useProfileSafety();
   const preserved = item ? evidenceUpdatePayload(item) : null;
-  const [evidenceType, setEvidenceType] = useState<ProfileEvidenceItem["evidenceType"]>(item?.evidenceType ?? "SELF_REPORT");
-  const [locator, setLocator] = useState(item?.locator ?? "");
-  const [observedAt, setObservedAt] = useState(observedInput(item?.observedAt ?? null));
+  const baselineEvidenceType = item?.evidenceType ?? "SELF_REPORT";
+  const baselineLocator = item?.locator ?? "";
+  const baselineObservedAt = observedInput(item?.observedAt ?? null);
+  const [evidenceType, setEvidenceType] = useState<ProfileEvidenceItem["evidenceType"]>(baselineEvidenceType);
+  const [locator, setLocator] = useState(baselineLocator);
+  const [observedAt, setObservedAt] = useState(baselineObservedAt);
   const [error, setError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  useUnsavedWarning(dirty);
+  const dirty = evidenceType !== baselineEvidenceType || locator !== baselineLocator || observedAt !== baselineObservedAt;
+  const dirtyKey = `SOURCE:${item?.evidenceId ?? "CREATE"}`;
+
+  function discard() {
+    setEvidenceType(baselineEvidenceType);
+    setLocator(baselineLocator);
+    setObservedAt(baselineObservedAt);
+    setError(null);
+  }
+
+  useProfileDirtyRegistration(dirtyKey, dirty, "Source", discard);
+
+  async function close() {
+    if (!await safety.requestDiscard({ message: PROFILE_SEMANTIC_COPY.unsaved.close, keys: [dirtyKey] })) return;
+    onClose();
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -670,15 +715,15 @@ function SourceForm({ item, mutate, pending, onClose }: Readonly<{ item: Profile
       const success = item
         ? await mutate("EVIDENCE_UPDATE", { evidenceId: item.evidenceId, ...base }, "Update source")
         : await mutate("EVIDENCE_CREATE", base, "Create source");
-      if (success) { setDirty(false); onClose(); }
+      if (success) onClose();
     } catch (cause) {
       setError(cause instanceof TypeError ? cause.message : "Review the source fields.");
     }
   }
 
   return (
-    <form className="profile-editor" onSubmit={submit} onChange={() => setDirty(true)}>
-      <div className="profile-editor-heading"><div><span className="field-label">{item ? "Edit source" : "New source"}</span><h3>Source details</h3></div><button className="close-button" type="button" aria-label="Close source form" onClick={() => { if (!dirty || window.confirm("Discard unsaved source changes?")) onClose(); }}>×</button></div>
+    <form className="profile-editor" onSubmit={submit}>
+      <div className="profile-editor-heading"><div><span className="field-label">{item ? "Edit source" : "New source"}</span><h3>Source details</h3></div><button className="close-button" type="button" aria-label="Close source form" onClick={() => void close()}>×</button></div>
       <FormErrorSummary message={error} />
       <div className="profile-form-grid">
         <Field label="Source type"><select value={evidenceType} onChange={(event) => setEvidenceType(event.target.value as ProfileEvidenceItem["evidenceType"])}>{PROFILE_EVIDENCE_TYPES.map((value) => <option value={value} key={value}>{value.replaceAll("_", " ")}</option>)}</select></Field>
@@ -703,7 +748,7 @@ function EducationSection({ document, mutate, pending }: Readonly<{ document: Pr
       <SectionHeading eyebrow="EDUCATION" title="Academic records as they appear at the source" description="Use the institution, degree, dates, country code, and raw GPA shown in your record. This MVP has no authoritative major or field-of-study field." />
       <div className="profile-section-toolbar"><p>{records.length} education record{records.length === 1 ? "" : "s"}</p><button className="primary-button" type="button" disabled={pending || sources.length === 0} onClick={() => { setEditing(null); setShowForm(true); }}>Add education</button></div>
       {sources.length === 0 ? <InlineNote>Create a Source first. Every Education record must reference one.</InlineNote> : null}
-      {showForm ? <EducationForm record={editing} sources={sources} mutate={mutate} pending={pending} onClose={() => { setShowForm(false); setEditing(null); }} /> : null}
+      {showForm ? <EducationForm document={document} record={editing} sources={sources} mutate={mutate} pending={pending} onClose={() => { setShowForm(false); setEditing(null); }} /> : null}
       <div className="profile-card-list">
         {records.length === 0 ? <EmptyMessage>No Education records have been entered.</EmptyMessage> : records.map((record) => {
           const mapping = mappingReadinessFor(document, record.degreeId);
@@ -716,7 +761,7 @@ function EducationSection({ document, mutate, pending }: Readonly<{ document: Pr
                 <div><dt>Country</dt><dd>{record.countryCode ?? "Not entered"}</dd></div>
                 <div><dt>GPA as entered</dt><dd>{record.gpaValue === null ? "Not entered" : `${record.gpaValue} / ${record.gpaScale}`}</dd></div>
               </dl>
-              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. Concept label unavailable in current MVP.</p>
+              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. {PROFILE_SEMANTIC_COPY.mapping.unavailable}</p>
               <div className="profile-inline-actions"><button className="secondary-button" type="button" disabled={pending} onClick={() => { setEditing(record); setShowForm(true); }}>Edit education</button><button className="text-danger-button" type="button" disabled={pending} onClick={() => setDeleteTarget(record)}>Delete</button></div>
             </article>
           );
@@ -729,13 +774,46 @@ function EducationSection({ document, mutate, pending }: Readonly<{ document: Pr
 
 type DegreeFormState = Readonly<{ institutionName: string; degreeName: string; degreeLevel: ProfileDegree["degreeLevel"]; degreeStatus: ProfileDegree["degreeStatus"]; startDate: string; completionDate: string; countryCode: string; gpaValue: string; gpaScale: string; evidenceId: string }>;
 
-function EducationForm({ record, sources, mutate, pending, onClose }: Readonly<{ record: ProfileDegree | null; sources: readonly ProfileEvidenceItem[]; mutate: Mutate; pending: boolean; onClose(): void }>) {
+function EducationForm({ document, record, sources, mutate, pending, onClose }: Readonly<{ document: ProfileDocument; record: ProfileDegree | null; sources: readonly ProfileEvidenceItem[]; mutate: Mutate; pending: boolean; onClose(): void }>) {
+  const safety = useProfileSafety();
   const base = record ? degreeUpdatePayload(record) : null;
-  const [form, setForm] = useState<DegreeFormState>({ institutionName: base?.institutionName ?? "", degreeName: base?.degreeName ?? "", degreeLevel: base?.degreeLevel ?? "BACHELORS", degreeStatus: base?.degreeStatus ?? "IN_PROGRESS", startDate: base?.startDate ?? "", completionDate: base?.completionDate ?? "", countryCode: base?.countryCode ?? "", gpaValue: base?.gpaValue?.toString() ?? "", gpaScale: base?.gpaScale?.toString() ?? "", evidenceId: base?.evidenceId ?? sources[0]?.evidenceId ?? "" });
+  const baseline: DegreeFormState = { institutionName: base?.institutionName ?? "", degreeName: base?.degreeName ?? "", degreeLevel: base?.degreeLevel ?? "BACHELORS", degreeStatus: base?.degreeStatus ?? "IN_PROGRESS", startDate: base?.startDate ?? "", completionDate: base?.completionDate ?? "", countryCode: base?.countryCode ?? "", gpaValue: base?.gpaValue?.toString() ?? "", gpaScale: base?.gpaScale?.toString() ?? "", evidenceId: base?.evidenceId ?? sources[0]?.evidenceId ?? "" };
+  const [form, setForm] = useState<DegreeFormState>(baseline);
   const [error, setError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  useUnsavedWarning(dirty);
+  const dirty = isProfileFormDirty(form, baseline);
+  const dirtyKey = `EDUCATION:${record?.degreeId ?? "CREATE"}`;
   const set = <Key extends keyof DegreeFormState>(key: Key, value: DegreeFormState[Key]) => setForm((current) => ({ ...current, [key]: value }));
+  const recoveryPayload: EducationRecoveryPayload = {
+    institutionName: form.institutionName,
+    degreeName: form.degreeName,
+    degreeLevel: form.degreeLevel,
+    degreeStatus: form.degreeStatus,
+    startDate: form.startDate,
+    completionDate: form.completionDate,
+    countryCode: form.countryCode,
+    gpaValue: form.gpaValue,
+    gpaScale: form.gpaScale,
+  };
+  const recovery = useProfileLocalRecovery({
+    identity: {
+      kind: "EDUCATION",
+      profileVersionId: document.profileVersionId,
+      versionNumber: document.versionNumber,
+      currentRevision: document.revision,
+      formContextId: record?.degreeId ?? "CREATE",
+    },
+    dirty,
+    payload: recoveryPayload,
+    apply: (payload) => setForm((current) => ({ ...current, ...payload })),
+    reset: () => { setForm(baseline); setError(null); },
+  });
+
+  useProfileDirtyRegistration(dirtyKey, dirty, "Education", recovery.discard);
+
+  async function close() {
+    if (!await safety.requestDiscard({ message: PROFILE_SEMANTIC_COPY.unsaved.close, keys: [dirtyKey] })) return;
+    onClose();
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -749,30 +827,33 @@ function EducationForm({ record, sources, mutate, pending, onClose }: Readonly<{
       if (!payload.institutionName || !payload.degreeName || !payload.evidenceId) throw new TypeError("Institution, degree name, and source are required.");
       if (payload.countryCode && !/^[A-Z]{2}$/.test(payload.countryCode)) throw new TypeError("Country code must contain two letters, such as CN or US.");
       const success = record ? await mutate("DEGREE_UPDATE", { degreeId: record.degreeId, ...payload }, "Update education") : await mutate("DEGREE_CREATE", payload, "Create education");
-      if (success) { setDirty(false); onClose(); }
+      if (success) { await recovery.clear(); onClose(); }
     } catch (cause) {
       setError(cause instanceof TypeError ? cause.message : "Review the Education fields.");
     }
   }
 
   return (
-    <form className="profile-editor" onSubmit={submit} onChange={() => setDirty(true)}>
-      <div className="profile-editor-heading"><div><span className="field-label">{record ? "Edit education" : "New education"}</span><h3>Academic record</h3></div><button className="close-button" type="button" aria-label="Close education form" onClick={() => { if (!dirty || window.confirm("Discard unsaved Education changes?")) onClose(); }}>×</button></div>
+    <form className="profile-editor" onSubmit={submit}>
+      <div className="profile-editor-heading"><div><span className="field-label">{record ? "Edit education" : "New education"}</span><h3>Academic record</h3></div><button className="close-button" type="button" aria-label="Close education form" onClick={() => void close()}>×</button></div>
       <FormErrorSummary message={error} />
-      <div className="profile-form-grid">
-        <Field label="Institution name" hint="Chinese, an official English name, or the transcript wording are accepted."><input required value={form.institutionName} onChange={(event) => set("institutionName", event.target.value)} /></Field>
-        <Field label="Degree name" hint="Enter the actual degree, such as 工学学士. Do not put a major here."><input required value={form.degreeName} onChange={(event) => set("degreeName", event.target.value)} /></Field>
-        <Field label="Degree level"><select value={form.degreeLevel} onChange={(event) => set("degreeLevel", event.target.value as ProfileDegree["degreeLevel"])}>{PROFILE_DEGREE_LEVELS.map((value) => <option value={value} key={value}>{value}</option>)}</select></Field>
-        <Field label="Degree status"><select value={form.degreeStatus} onChange={(event) => set("degreeStatus", event.target.value as ProfileDegree["degreeStatus"])}>{PROFILE_DEGREE_STATUSES.map((value) => <option value={value} key={value}>{value.replaceAll("_", " ")}</option>)}</select></Field>
-        <Field label="Start date"><input type="date" value={form.startDate} onChange={(event) => set("startDate", event.target.value)} /></Field>
-        <Field label="Completion date"><input type="date" value={form.completionDate} onChange={(event) => set("completionDate", event.target.value)} /></Field>
-        <Field label="Country code" hint="Two-letter source country code, for example CN."><input maxLength={2} value={form.countryCode} onChange={(event) => set("countryCode", event.target.value)} /></Field>
-        <Field label="Source"><select required value={form.evidenceId} onChange={(event) => set("evidenceId", event.target.value)}><option value="">Select source</option>{sources.map((source, index) => <option value={source.evidenceId} key={source.evidenceId}>{source.evidenceType.replaceAll("_", " ")} {source.locator ? `— ${source.locator}` : `#${index + 1}`}</option>)}</select></Field>
-        <Field label="GPA value" hint="Enter exactly as shown; no 4.0 conversion."><input inputMode="decimal" value={form.gpaValue} onChange={(event) => set("gpaValue", event.target.value)} placeholder="85" /></Field>
-        <Field label="GPA scale" hint="Keep the original scale."><input inputMode="decimal" value={form.gpaScale} onChange={(event) => set("gpaScale", event.target.value)} placeholder="100" /></Field>
-      </div>
-      <p className="profile-disclosure">Enter the GPA exactly as shown in your academic record. Do not convert it to a U.S. 4.0 scale.</p>
-      <button className="primary-button" type="submit" disabled={pending}>{pending ? "Saving…" : "Save education"}</button>
+      {recovery.candidate ? <RecoveryPrompt revisionChanged={recovery.candidate.revisionChanged} onRestore={recovery.restore} onDiscard={() => void recovery.discard()} /> : null}
+      <fieldset className="profile-recovery-fieldset" disabled={recovery.candidate !== null}>
+        <div className="profile-form-grid">
+          <Field label="Institution name" hint="Chinese, an official English name, or the transcript wording are accepted."><input required value={form.institutionName} onChange={(event) => set("institutionName", event.target.value)} /></Field>
+          <Field label="Degree name" hint="Enter the actual degree, such as 工学学士. Do not put a major here."><input required value={form.degreeName} onChange={(event) => set("degreeName", event.target.value)} /></Field>
+          <Field label="Degree level"><select value={form.degreeLevel} onChange={(event) => set("degreeLevel", event.target.value as ProfileDegree["degreeLevel"])}>{PROFILE_DEGREE_LEVELS.map((value) => <option value={value} key={value}>{value}</option>)}</select></Field>
+          <Field label="Degree status"><select value={form.degreeStatus} onChange={(event) => set("degreeStatus", event.target.value as ProfileDegree["degreeStatus"])}>{PROFILE_DEGREE_STATUSES.map((value) => <option value={value} key={value}>{value.replaceAll("_", " ")}</option>)}</select></Field>
+          <Field label="Start date"><input type="date" value={form.startDate} onChange={(event) => set("startDate", event.target.value)} /></Field>
+          <Field label="Completion date"><input type="date" value={form.completionDate} onChange={(event) => set("completionDate", event.target.value)} /></Field>
+          <Field label="Country code" hint="Two-letter source country code, for example CN."><input maxLength={2} value={form.countryCode} onChange={(event) => set("countryCode", event.target.value)} /></Field>
+          <Field label="Source"><select required value={form.evidenceId} onChange={(event) => set("evidenceId", event.target.value)}><option value="">Select source</option>{sources.map((source, index) => <option value={source.evidenceId} key={source.evidenceId}>{source.evidenceType.replaceAll("_", " ")} {source.locator ? `— ${source.locator}` : `#${index + 1}`}</option>)}</select></Field>
+          <Field label="GPA value" hint="Enter exactly as shown; no 4.0 conversion."><input inputMode="decimal" value={form.gpaValue} onChange={(event) => set("gpaValue", event.target.value)} placeholder="85" /></Field>
+          <Field label="GPA scale" hint="Keep the original scale."><input inputMode="decimal" value={form.gpaScale} onChange={(event) => set("gpaScale", event.target.value)} placeholder="100" /></Field>
+        </div>
+        <p className="profile-disclosure">{PROFILE_SEMANTIC_COPY.inference.gpaRepresentation}</p>
+        <button className="primary-button" type="submit" disabled={pending}>{pending ? "Saving…" : "Save education"}</button>
+      </fieldset>
     </form>
   );
 }
@@ -789,7 +870,7 @@ function CoursesSection({ document, mutate, pending }: Readonly<{ document: Prof
       <SectionHeading eyebrow="COURSES" title="Course history without equivalency guesses" description="Keep course titles, credits, terms, and grades in their source representation. The UI does not translate courses or convert credits and grades." />
       <div className="profile-section-toolbar"><p>{records.length} course record{records.length === 1 ? "" : "s"}</p><button className="primary-button" type="button" disabled={pending || sources.length === 0} onClick={() => { setEditing(null); setShowForm(true); }}>Add course</button></div>
       {sources.length === 0 ? <InlineNote>Create a Source first. Every Course record must reference one.</InlineNote> : null}
-      {showForm ? <CourseForm record={editing} sources={sources} education={education} mutate={mutate} pending={pending} onClose={() => { setShowForm(false); setEditing(null); }} /> : null}
+      {showForm ? <CourseForm document={document} record={editing} sources={sources} education={education} mutate={mutate} pending={pending} onClose={() => { setShowForm(false); setEditing(null); }} /> : null}
       <div className="profile-course-list">
         {records.length === 0 ? <EmptyMessage>No Course records have been entered.</EmptyMessage> : records.map((record) => {
           const mapping = mappingReadinessFor(document, record.courseId);
@@ -802,7 +883,7 @@ function CoursesSection({ document, mutate, pending }: Readonly<{ document: Prof
                 <div><dt>Credits as entered</dt><dd>{record.credits ?? "Not entered"}</dd></div>
                 <div><dt>Grade as entered</dt><dd>{record.gradeValue === null ? record.gradeText ?? "Not entered" : `${record.gradeValue} / ${record.gradeScale}${record.gradeText ? ` · ${record.gradeText}` : ""}`}</dd></div>
               </dl>
-              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. Concept label unavailable in current MVP.</p>
+              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. {PROFILE_SEMANTIC_COPY.mapping.unavailable}</p>
               <div className="profile-inline-actions"><button className="secondary-button" type="button" disabled={pending} onClick={() => { setEditing(record); setShowForm(true); }}>Edit course</button><button className="text-danger-button" type="button" disabled={pending} onClick={() => setDeleteTarget(record)}>Delete</button></div>
             </article>
           );
@@ -815,13 +896,46 @@ function CoursesSection({ document, mutate, pending }: Readonly<{ document: Prof
 
 type CourseFormState = Readonly<{ degreeId: string; courseCode: string; courseTitle: string; courseStatus: ProfileCourse["courseStatus"]; term: string; completionDate: string; credits: string; gradeValue: string; gradeScale: string; gradeText: string; evidenceId: string }>;
 
-function CourseForm({ record, sources, education, mutate, pending, onClose }: Readonly<{ record: ProfileCourse | null; sources: readonly ProfileEvidenceItem[]; education: readonly ProfileDegree[]; mutate: Mutate; pending: boolean; onClose(): void }>) {
+function CourseForm({ document, record, sources, education, mutate, pending, onClose }: Readonly<{ document: ProfileDocument; record: ProfileCourse | null; sources: readonly ProfileEvidenceItem[]; education: readonly ProfileDegree[]; mutate: Mutate; pending: boolean; onClose(): void }>) {
+  const safety = useProfileSafety();
   const base = record ? courseUpdatePayload(record) : null;
-  const [form, setForm] = useState<CourseFormState>({ degreeId: base?.degreeId ?? education[0]?.degreeId ?? "", courseCode: base?.courseCode ?? "", courseTitle: base?.courseTitle ?? "", courseStatus: base?.courseStatus ?? "COMPLETED", term: base?.term ?? "", completionDate: base?.completionDate ?? "", credits: base?.credits?.toString() ?? "", gradeValue: base?.gradeValue?.toString() ?? "", gradeScale: base?.gradeScale?.toString() ?? "", gradeText: base?.gradeText ?? "", evidenceId: base?.evidenceId ?? sources[0]?.evidenceId ?? "" });
+  const baseline: CourseFormState = { degreeId: base?.degreeId ?? education[0]?.degreeId ?? "", courseCode: base?.courseCode ?? "", courseTitle: base?.courseTitle ?? "", courseStatus: base?.courseStatus ?? "COMPLETED", term: base?.term ?? "", completionDate: base?.completionDate ?? "", credits: base?.credits?.toString() ?? "", gradeValue: base?.gradeValue?.toString() ?? "", gradeScale: base?.gradeScale?.toString() ?? "", gradeText: base?.gradeText ?? "", evidenceId: base?.evidenceId ?? sources[0]?.evidenceId ?? "" };
+  const [form, setForm] = useState<CourseFormState>(baseline);
   const [error, setError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  useUnsavedWarning(dirty);
+  const dirty = isProfileFormDirty(form, baseline);
+  const dirtyKey = `COURSE:${record?.courseId ?? "CREATE"}`;
   const set = <Key extends keyof CourseFormState>(key: Key, value: CourseFormState[Key]) => setForm((current) => ({ ...current, [key]: value }));
+  const recoveryPayload: CourseRecoveryPayload = {
+    courseCode: form.courseCode,
+    courseTitle: form.courseTitle,
+    courseStatus: form.courseStatus,
+    term: form.term,
+    completionDate: form.completionDate,
+    credits: form.credits,
+    gradeValue: form.gradeValue,
+    gradeScale: form.gradeScale,
+    gradeText: form.gradeText,
+  };
+  const recovery = useProfileLocalRecovery({
+    identity: {
+      kind: "COURSE",
+      profileVersionId: document.profileVersionId,
+      versionNumber: document.versionNumber,
+      currentRevision: document.revision,
+      formContextId: record?.courseId ?? "CREATE",
+    },
+    dirty,
+    payload: recoveryPayload,
+    apply: (payload) => setForm((current) => ({ ...current, ...payload })),
+    reset: () => { setForm(baseline); setError(null); },
+  });
+
+  useProfileDirtyRegistration(dirtyKey, dirty, "Course", recovery.discard);
+
+  async function close() {
+    if (!await safety.requestDiscard({ message: PROFILE_SEMANTIC_COPY.unsaved.close, keys: [dirtyKey] })) return;
+    onClose();
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -836,31 +950,34 @@ function CourseForm({ record, sources, education, mutate, pending, onClose }: Re
       const payload = { degreeId: nullableText(form.degreeId), courseCode: nullableText(form.courseCode), courseTitle: form.courseTitle.trim(), courseStatus: form.courseStatus, term: nullableText(form.term), completionDate: nullableText(form.completionDate), credits, gradeValue, gradeScale, gradeText: nullableText(form.gradeText), evidenceId: form.evidenceId };
       if (!payload.courseTitle || !payload.evidenceId) throw new TypeError("Course title and source are required.");
       const success = record ? await mutate("COURSE_UPDATE", { courseId: record.courseId, ...payload }, "Update course") : await mutate("COURSE_CREATE", payload, "Create course");
-      if (success) { setDirty(false); onClose(); }
+      if (success) { await recovery.clear(); onClose(); }
     } catch (cause) {
       setError(cause instanceof TypeError ? cause.message : "Review the Course fields.");
     }
   }
 
   return (
-    <form className="profile-editor" onSubmit={submit} onChange={() => setDirty(true)}>
-      <div className="profile-editor-heading"><div><span className="field-label">{record ? "Edit course" : "New course"}</span><h3>Course record</h3></div><button className="close-button" type="button" aria-label="Close course form" onClick={() => { if (!dirty || window.confirm("Discard unsaved Course changes?")) onClose(); }}>×</button></div>
+    <form className="profile-editor" onSubmit={submit}>
+      <div className="profile-editor-heading"><div><span className="field-label">{record ? "Edit course" : "New course"}</span><h3>Course record</h3></div><button className="close-button" type="button" aria-label="Close course form" onClick={() => void close()}>×</button></div>
       <FormErrorSummary message={error} />
-      <div className="profile-form-grid">
-        <Field label="Education context"><select value={form.degreeId} onChange={(event) => set("degreeId", event.target.value)}><option value="">Profile-wide course history</option>{education.map((degree) => <option value={degree.degreeId} key={degree.degreeId}>{degree.institutionName} — {degree.degreeName}</option>)}</select></Field>
-        <Field label="Source"><select required value={form.evidenceId} onChange={(event) => set("evidenceId", event.target.value)}><option value="">Select source</option>{sources.map((source, index) => <option value={source.evidenceId} key={source.evidenceId}>{source.evidenceType.replaceAll("_", " ")} {source.locator ? `— ${source.locator}` : `#${index + 1}`}</option>)}</select></Field>
-        <Field label="Course code"><input value={form.courseCode} onChange={(event) => set("courseCode", event.target.value)} /></Field>
-        <Field label="Course title" hint="Use the source language. No AI translation is written to your Profile."><input required value={form.courseTitle} onChange={(event) => set("courseTitle", event.target.value)} /></Field>
-        <Field label="Course status"><select value={form.courseStatus} onChange={(event) => set("courseStatus", event.target.value as ProfileCourse["courseStatus"])}>{PROFILE_COURSE_STATUSES.map((value) => <option value={value} key={value}>{value.replaceAll("_", " ")}</option>)}</select></Field>
-        <Field label="Term" hint="Free text such as 2024 秋 is accepted."><input value={form.term} onChange={(event) => set("term", event.target.value)} /></Field>
-        <Field label="Completion date"><input type="date" value={form.completionDate} onChange={(event) => set("completionDate", event.target.value)} /></Field>
-        <Field label="Credits as shown" hint="No conversion to U.S. semester credits."><input inputMode="decimal" value={form.credits} onChange={(event) => set("credits", event.target.value)} /></Field>
-        <Field label="Numeric grade value"><input inputMode="decimal" value={form.gradeValue} onChange={(event) => set("gradeValue", event.target.value)} placeholder="92" /></Field>
-        <Field label="Numeric grade scale"><input inputMode="decimal" value={form.gradeScale} onChange={(event) => set("gradeScale", event.target.value)} placeholder="100" /></Field>
-        <Field label="Grade text" hint="A, 优秀, 良好, or other source text."><input value={form.gradeText} onChange={(event) => set("gradeText", event.target.value)} /></Field>
-      </div>
-      <p className="profile-disclosure">Credits and grades remain in their original representation. No course equivalency is inferred.</p>
-      <button className="primary-button" type="submit" disabled={pending}>{pending ? "Saving…" : "Save course"}</button>
+      {recovery.candidate ? <RecoveryPrompt revisionChanged={recovery.candidate.revisionChanged} onRestore={recovery.restore} onDiscard={() => void recovery.discard()} /> : null}
+      <fieldset className="profile-recovery-fieldset" disabled={recovery.candidate !== null}>
+        <div className="profile-form-grid">
+          <Field label="Education context"><select value={form.degreeId} onChange={(event) => set("degreeId", event.target.value)}><option value="">Profile-wide course history</option>{education.map((degree) => <option value={degree.degreeId} key={degree.degreeId}>{degree.institutionName} — {degree.degreeName}</option>)}</select></Field>
+          <Field label="Source"><select required value={form.evidenceId} onChange={(event) => set("evidenceId", event.target.value)}><option value="">Select source</option>{sources.map((source, index) => <option value={source.evidenceId} key={source.evidenceId}>{source.evidenceType.replaceAll("_", " ")} {source.locator ? `— ${source.locator}` : `#${index + 1}`}</option>)}</select></Field>
+          <Field label="Course code"><input value={form.courseCode} onChange={(event) => set("courseCode", event.target.value)} /></Field>
+          <Field label="Course title" hint={PROFILE_SEMANTIC_COPY.inference.courseTranslation}><input required value={form.courseTitle} onChange={(event) => set("courseTitle", event.target.value)} /></Field>
+          <Field label="Course status"><select value={form.courseStatus} onChange={(event) => set("courseStatus", event.target.value as ProfileCourse["courseStatus"])}>{PROFILE_COURSE_STATUSES.map((value) => <option value={value} key={value}>{value.replaceAll("_", " ")}</option>)}</select></Field>
+          <Field label="Term" hint="Free text such as 2024 秋 is accepted."><input value={form.term} onChange={(event) => set("term", event.target.value)} /></Field>
+          <Field label="Completion date"><input type="date" value={form.completionDate} onChange={(event) => set("completionDate", event.target.value)} /></Field>
+          <Field label="Credits as shown" hint="No conversion to U.S. semester credits."><input inputMode="decimal" value={form.credits} onChange={(event) => set("credits", event.target.value)} /></Field>
+          <Field label="Numeric grade value"><input inputMode="decimal" value={form.gradeValue} onChange={(event) => set("gradeValue", event.target.value)} placeholder="92" /></Field>
+          <Field label="Numeric grade scale"><input inputMode="decimal" value={form.gradeScale} onChange={(event) => set("gradeScale", event.target.value)} placeholder="100" /></Field>
+          <Field label="Grade text" hint="A, 优秀, 良好, or other source text."><input value={form.gradeText} onChange={(event) => set("gradeText", event.target.value)} /></Field>
+        </div>
+        <p className="profile-disclosure">{PROFILE_SEMANTIC_COPY.inference.courseRepresentation}</p>
+        <button className="primary-button" type="submit" disabled={pending}>{pending ? "Saving…" : "Save course"}</button>
+      </fieldset>
     </form>
   );
 }
@@ -870,7 +987,7 @@ function CompletenessSection({ document, mutate, pending }: Readonly<{ document:
   return (
     <section>
       <SectionHeading eyebrow="COMPLETENESS" title="Declare what you can confirm" description="Completeness is your explicit statement about a defined data scope. It is not calculated from record counts and does not describe any program requirement." />
-      <div className="profile-completeness-law"><strong>Only a missing required declaration directly prevents freeze.</strong><span>PARTIAL and UNKNOWN remain valid declarations when their explanation is recorded.</span></div>
+      <div className="profile-completeness-law"><strong>{PROFILE_SEMANTIC_COPY.completeness.law}</strong><span>{PROFILE_SEMANTIC_COPY.completeness.lawDetail}</span></div>
       <div className="profile-card-list">
         {scopes.map((scope) => <CompletenessCard key={scope.key} scope={scope} document={document} mutate={mutate} pending={pending} />)}
       </div>
@@ -879,11 +996,38 @@ function CompletenessSection({ document, mutate, pending }: Readonly<{ document:
 }
 
 function CompletenessCard({ scope, document, mutate, pending }: Readonly<{ scope: ProfileCompletenessScope; document: ProfileDocument; mutate: Mutate; pending: boolean }>) {
-  const [value, setValue] = useState<"COMPLETE" | "PARTIAL" | "UNKNOWN">(scope.completeness === "MISSING_DECLARATION" ? "UNKNOWN" : scope.completeness);
-  const [explanation, setExplanation] = useState(scope.explanation ?? "");
+  const baselineValue = scope.completeness === "MISSING_DECLARATION" ? "UNKNOWN" : scope.completeness;
+  const baselineExplanation = scope.explanation ?? "";
+  const [value, setValue] = useState<"COMPLETE" | "PARTIAL" | "UNKNOWN">(baselineValue);
+  const [explanation, setExplanation] = useState(baselineExplanation);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(scope.completeness === "MISSING_DECLARATION");
   const context = scope.educationContextId ? degreeLabel(document, scope.educationContextId) : "Profile-wide scope";
+  const dirty = value !== baselineValue || explanation !== baselineExplanation;
+  const formContextId = `${scope.educationContextId ?? "GLOBAL"}:${scope.domain}`;
+  const dirtyKey = `COMPLETENESS:${formContextId}`;
+  const recoveryPayload: CompletenessRecoveryPayload = { value, explanation };
+  const reset = () => {
+    setValue(baselineValue);
+    setExplanation(baselineExplanation);
+    setError(null);
+    if (scope.completeness !== "MISSING_DECLARATION") setEditing(false);
+  };
+  const recovery = useProfileLocalRecovery({
+    identity: {
+      kind: "COMPLETENESS",
+      profileVersionId: document.profileVersionId,
+      versionNumber: document.versionNumber,
+      currentRevision: document.revision,
+      formContextId,
+    },
+    dirty,
+    payload: recoveryPayload,
+    apply: (payload) => { setValue(payload.value); setExplanation(payload.explanation); setEditing(true); },
+    reset,
+  });
+
+  useProfileDirtyRegistration(dirtyKey, dirty, `Completeness: ${scope.domain}`, recovery.discard);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -893,7 +1037,7 @@ function CompletenessCard({ scope, document, mutate, pending }: Readonly<{ scope
       return;
     }
     const success = await mutate("COMPLETENESS_UPSERT", { educationContextId: scope.educationContextId, domain: scope.domain, completeness: value, explanation: normalizedExplanation }, `Save ${PROFILE_DOMAIN_LABELS[scope.domain]} declaration`);
-    if (success) { setError(null); setEditing(false); }
+    if (success) { await recovery.clear(); setError(null); setEditing(false); }
   }
 
   return (
@@ -904,9 +1048,10 @@ function CompletenessCard({ scope, document, mutate, pending }: Readonly<{ scope
       {!editing ? <button className="secondary-button" type="button" disabled={pending} onClick={() => setEditing(true)}>Change declaration</button> : (
         <form className="completeness-form" onSubmit={submit}>
           <FormErrorSummary message={error} />
-          <fieldset><legend>How complete is the {PROFILE_DOMAIN_LABELS[scope.domain].toLowerCase()} entered for this Profile?</legend>{PROFILE_COMPLETENESS_VALUES.map((option) => <label className="profile-radio" key={option}><input type="radio" name={`completeness-${scope.key}`} value={option} checked={value === option} onChange={() => { setValue(option); if (option === "COMPLETE") setExplanation(""); }} /><span><strong>{option}</strong><small>{completenessDescription(option)}</small></span></label>)}</fieldset>
-          {value !== "COMPLETE" ? <Field label={`${value} explanation`}><textarea required rows={3} value={explanation} onChange={(event) => setExplanation(event.target.value)} /></Field> : null}
-          <div className="profile-inline-actions"><button className="primary-button" type="submit" disabled={pending}>Save declaration</button>{scope.completeness !== "MISSING_DECLARATION" ? <button className="secondary-button" type="button" onClick={() => { setValue(scope.completeness as "COMPLETE" | "PARTIAL" | "UNKNOWN"); setExplanation(scope.explanation ?? ""); setEditing(false); }}>Cancel</button> : null}</div>
+          {recovery.candidate ? <RecoveryPrompt revisionChanged={recovery.candidate.revisionChanged} onRestore={recovery.restore} onDiscard={() => void recovery.discard()} /> : null}
+          <fieldset disabled={recovery.candidate !== null}><legend>How complete is the {PROFILE_DOMAIN_LABELS[scope.domain].toLowerCase()} entered for this Profile?</legend>{PROFILE_COMPLETENESS_VALUES.map((option) => <label className="profile-radio" key={option}><input type="radio" name={`completeness-${scope.key}`} value={option} checked={value === option} onChange={() => { setValue(option); if (option === "COMPLETE") setExplanation(""); }} /><span><strong>{option}</strong><small>{completenessDescription(option)}</small></span></label>)}</fieldset>
+          {value !== "COMPLETE" ? <Field label={`${value} explanation`}><textarea required rows={3} disabled={recovery.candidate !== null} value={explanation} onChange={(event) => setExplanation(event.target.value)} /></Field> : null}
+          <div className="profile-inline-actions"><button className="primary-button" type="submit" disabled={pending || recovery.candidate !== null}>Save declaration</button>{dirty || scope.completeness !== "MISSING_DECLARATION" ? <button className="secondary-button" type="button" onClick={() => void recovery.discard()}>{PROFILE_SEMANTIC_COPY.unsaved.discard}</button> : null}</div>
         </form>
       )}
     </article>
@@ -925,7 +1070,7 @@ function ReviewSection({ document, pending, onFreeze }: Readonly<{ document: Pro
       <div className="profile-review-banner"><div><span className="field-label">Version</span><strong>Draft v{document.versionNumber}</strong></div><div><span className="field-label">Revision</span><strong>{document.revision}</strong></div><div><span className="field-label">Freeze readiness</span><StatusPill value={document.readiness.freezeReady ? "READY" : "MISSING_DECLARATION"} /></div></div>
       <div className="profile-two-column">
         <ReviewList title="Profile records" items={[`${overview.counts.sources} Sources`, `${overview.counts.education} Education records`, `${overview.counts.courses} Course records`]} />
-        <ReviewList title="Unsupported editing in this MVP" items={["Tests", "Experience", "Skills", "Goals", "Preferences"]} />
+        <ReviewList title={PROFILE_SEMANTIC_COPY.unsupported.reviewHeading} items={["Tests", "Experience", "Skills", "Goals", "Preferences"]} />
       </div>
       <article className="profile-section-card">
         <h3>Completeness declarations</h3>
@@ -936,14 +1081,14 @@ function ReviewSection({ document, pending, onFreeze }: Readonly<{ document: Pro
       </article>
       <article className="profile-section-card">
         <h3>Mapping readiness</h3>
-        {document.readiness.mappingReadiness.length === 0 ? <p>No Degree or Course mapping state is present.</p> : <div className="profile-review-scopes">{document.readiness.mappingReadiness.map((mapping) => <div key={`${mapping.recordType}-${mapping.recordId}`}><span>{mapping.recordType === "DEGREE" ? degreeLabel(document, mapping.recordId) : courses(document).find((course) => course.courseId === mapping.recordId)?.courseTitle ?? "Course record"}<small>Concept label unavailable in current MVP.</small></span><StatusPill value={mapping.verified ? "VERIFIED" : mapping.mappingStatuses[0] ?? "UNKNOWN"} /></div>)}</div>}
-        <p className="profile-card-note">Mapping readiness is displayed separately and is not used by this UI to infer completeness.</p>
+        {document.readiness.mappingReadiness.length === 0 ? <p>No Degree or Course mapping state is present.</p> : <div className="profile-review-scopes">{document.readiness.mappingReadiness.map((mapping) => <div key={`${mapping.recordType}-${mapping.recordId}`}><span>{mapping.recordType === "DEGREE" ? degreeLabel(document, mapping.recordId) : courses(document).find((course) => course.courseId === mapping.recordId)?.courseTitle ?? "Course record"}<small>{PROFILE_SEMANTIC_COPY.mapping.unavailable}</small></span><StatusPill value={mapping.verified ? "VERIFIED" : mapping.mappingStatuses[0] ?? "UNKNOWN"} /></div>)}</div>}
+        <p className="profile-card-note">{PROFILE_SEMANTIC_COPY.mapping.noInference}</p>
       </article>
       <article className="profile-freeze-card">
-        <h3>What freezing means</h3>
-        <p>Freezing creates an immutable version of the information currently stored in this Profile for use by downstream evaluations.</p>
-        <p>Freezing does not mean that your information has been externally verified; your Profile is complete or error-free; you satisfy any program requirement; or your admission likelihood has been assessed.</p>
-        <label className="profile-confirm-check"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>I understand that this exact version becomes immutable and that freeze does not add verification or evaluation meaning.</span></label>
+        <h3>{PROFILE_SEMANTIC_COPY.reviewFreeze.heading}</h3>
+        <p>{PROFILE_SEMANTIC_COPY.reviewFreeze.explanation}</p>
+        <p>{PROFILE_SEMANTIC_COPY.reviewFreeze.warning}</p>
+        <label className="profile-confirm-check"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>{PROFILE_SEMANTIC_COPY.reviewFreeze.confirmation}</span></label>
         <button className="primary-button freeze-button" type="button" disabled={pending || !document.readiness.freezeReady || !confirmed} onClick={onFreeze}>{pending ? "Freezing…" : "Freeze this Profile version"}</button>
         {!document.readiness.freezeReady ? <small>Complete every required declaration before requesting freeze. PARTIAL and UNKNOWN are allowed when explained.</small> : null}
       </article>
@@ -960,13 +1105,13 @@ function FrozenProfileView({ document, state }: Readonly<{ document: ProfileDocu
   return (
     <div className="profile-frozen-view" data-testid="profile-frozen-view">
       <ProfileLiveStatus state={state} />
-      <header className="profile-frozen-hero"><div><p className="eyebrow">IMMUTABLE PROFILE VERSION</p><h2>Frozen v{document.versionNumber}</h2><p>This is the authoritative document returned by the freeze operation. It cannot be edited in place.</p></div><StatusPill value="FROZEN" /></header>
+      <header className="profile-frozen-hero"><div><p className="eyebrow">{PROFILE_SEMANTIC_COPY.frozen.heading}</p><h2>Frozen v{document.versionNumber}</h2><p>{PROFILE_SEMANTIC_COPY.frozen.explanation}</p></div><StatusPill value={PROFILE_SEMANTIC_COPY.frozen.status} /></header>
       <div className="profile-review-banner"><div><span className="field-label">Frozen at</span><strong>{document.frozenAt ? new Date(document.frozenAt).toLocaleString() : "Unavailable"}</strong></div><div><span className="field-label">Sources</span><strong>{overview.counts.sources}</strong></div><div><span className="field-label">Education / Courses</span><strong>{overview.counts.education} / {overview.counts.courses}</strong></div></div>
       <div className="profile-two-column"><ReviewList title="Source provenance" items={evidenceItems(document).map((source) => `${source.evidenceType.replaceAll("_", " ")} — ${source.locator ?? "No reference entered"}`)} /><ReviewList title="Education" items={degrees(document).map((degree) => `${degree.institutionName} — ${degree.degreeName}`)} /></div>
       <article className="profile-section-card"><h3>Courses</h3>{courses(document).length === 0 ? <p>No Course records were stored.</p> : <ul className="profile-review-list">{courses(document).map((course) => <li key={course.courseId}>{course.courseTitle} · {course.gradeText ?? (course.gradeValue === null ? "No grade entered" : `${course.gradeValue} / ${course.gradeScale}`)}</li>)}</ul>}</article>
       <article className="profile-section-card"><h3>Completeness declarations</h3><div className="profile-review-scopes">{overview.completenessScopes.map((scope) => <div key={scope.key}><span>{PROFILE_DOMAIN_LABELS[scope.domain]}<small>{scope.explanation ?? completenessDescription(scope.completeness)}</small></span><StatusPill value={scope.completeness} /></div>)}</div></article>
       <InlineNote>Historical frozen-version discovery is not available in this MVP. This immediate view is available from the freeze response, but a refresh or later sign-in cannot currently rediscover it.</InlineNote>
-      <p className="profile-disclosure">This frozen state does not mean the information was externally verified, error-free, sufficient for any program, or assessed for admission likelihood.</p>
+      <p className="profile-disclosure">{PROFILE_SEMANTIC_COPY.frozen.disclosure}</p>
     </div>
   );
 }
@@ -977,13 +1122,4 @@ function EmptyMessage({ children }: Readonly<{ children: ReactNode }>) {
 
 function InlineNote({ children }: Readonly<{ children: ReactNode }>) {
   return <div className="profile-inline-note" role="note">{children}</div>;
-}
-
-function useUnsavedWarning(dirty: boolean) {
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
 }

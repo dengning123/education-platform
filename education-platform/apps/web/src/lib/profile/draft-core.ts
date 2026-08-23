@@ -1,4 +1,5 @@
 import type { ProfileCommandPayloads, ProfileDocument } from "./contracts";
+import { PROFILE_SEMANTIC_COPY } from "./semantic-copy";
 
 export const PROFILE_DRAFT_SECTIONS = [
   "overview",
@@ -229,16 +230,9 @@ export function courseUpdatePayload(course: ProfileCourse): ProfileCommandPayloa
 }
 
 export function sourceDescription(item: ProfileEvidenceItem): string {
-  if (item.evidenceType === "SELF_REPORT") return "Student-provided information; not externally verified.";
-  if (item.evidenceType === "TRANSCRIPT") return "Information referenced from a transcript source.";
-  if (item.evidenceType === "TEST_REPORT") return "Information referenced from a test report source.";
-  if (item.evidenceType === "RESUME") return "Information referenced from a resume source.";
-  return "Information referenced from another student-identified source.";
+  return PROFILE_SEMANTIC_COPY.source[item.evidenceType];
 }
 
 export function completenessDescription(value: ProfileCompletenessScope["completeness"]): string {
-  if (value === "COMPLETE") return "You have explicitly declared that this data scope is complete.";
-  if (value === "PARTIAL") return "You have provided some information, but you have declared that this scope is not complete.";
-  if (value === "UNKNOWN") return "You cannot currently confirm whether this data scope is complete.";
-  return "No completeness declaration has been provided for this required scope.";
+  return PROFILE_SEMANTIC_COPY.completeness[value];
 }
