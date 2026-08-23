@@ -25,11 +25,13 @@ import {
   PROFILE_EVIDENCE_TYPES,
   parseProfileDocument,
   parseProfileOperationResult,
+  parseProfileTaxonomyProjection,
   type ProfileCommand,
   type ProfileCommandPayloads,
   type ProfileDocument,
   type ProfileMutationCommand,
   type ProfileOperationResult,
+  type ProfileTaxonomyProjection,
 } from "@/lib/profile/contracts";
 import {
   PROFILE_DOMAIN_LABELS,
@@ -45,6 +47,7 @@ import {
   evidenceUpdatePayload,
   evidenceUsage,
   mappingReadinessFor,
+  mappingLabelsFor,
   profileOverview,
   sourceDescription,
   type ProfileCompletenessScope,
@@ -264,10 +267,49 @@ export function ProfileDraftCore() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const mutationLock = useRef(false);
   const documentRef = useRef<ProfileDocument | null>(null);
+  const [loadedTaxonomy, setLoadedTaxonomy] = useState<Readonly<{
+    profileVersionId: string;
+    revision: number;
+    projection: ProfileTaxonomyProjection;
+  }> | null>(null);
+  const taxonomyProfileVersionId = state.document?.profileVersionId ?? null;
+  const taxonomyRevision = state.document?.revision ?? null;
 
   useEffect(() => {
     documentRef.current = state.document;
   }, [state.document]);
+
+  useEffect(() => {
+    if (!taxonomyProfileVersionId || taxonomyRevision === null) return;
+    let current = true;
+    void (async () => {
+      const result = await postProfileRequest<ProfileTaxonomyProjection>("taxonomy", {
+        profileVersionId: taxonomyProfileVersionId,
+      });
+      if (!current || !result.ok) return;
+      try {
+        const projection = parseProfileTaxonomyProjection(result.data);
+        if (current) {
+          setLoadedTaxonomy(Object.freeze({
+            profileVersionId: taxonomyProfileVersionId,
+            revision: taxonomyRevision,
+            projection,
+          }));
+        }
+      } catch {
+        // Projection labels are supplementary. The authoritative readiness state remains usable.
+      }
+    })();
+    return () => {
+      current = false;
+    };
+  }, [taxonomyProfileVersionId, taxonomyRevision]);
+
+  const taxonomy = loadedTaxonomy
+    && loadedTaxonomy.profileVersionId === taxonomyProfileVersionId
+    && loadedTaxonomy.revision === taxonomyRevision
+    ? loadedTaxonomy.projection
+    : null;
 
   useEffect(() => {
     if (!state.document || state.document.status !== "DRAFT") return;
@@ -560,10 +602,10 @@ export function ProfileDraftCore() {
 
         {state.section === "overview" ? <OverviewSection document={state.document} onNavigate={(section) => void changeSection(section)} /> : null}
         {state.section === "sources" ? <SourcesSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
-        {state.section === "education" ? <EducationSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
-        {state.section === "courses" ? <CoursesSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
+        {state.section === "education" ? <EducationSection document={state.document} taxonomy={taxonomy} mutate={mutate} pending={state.pending} /> : null}
+        {state.section === "courses" ? <CoursesSection document={state.document} taxonomy={taxonomy} mutate={mutate} pending={state.pending} /> : null}
         {state.section === "completeness" ? <CompletenessSection document={state.document} mutate={mutate} pending={state.pending} /> : null}
-        {state.section === "review" ? <ReviewSection document={state.document} pending={state.pending} onFreeze={() => void freezeProfile()} /> : null}
+        {state.section === "review" ? <ReviewSection document={state.document} taxonomy={taxonomy} pending={state.pending} onFreeze={() => void freezeProfile()} /> : null}
       </div>
     </div>
   );
@@ -736,7 +778,7 @@ function SourceForm({ item, mutate, pending, onClose }: Readonly<{ item: Profile
   );
 }
 
-function EducationSection({ document, mutate, pending }: Readonly<{ document: ProfileDocument; mutate: Mutate; pending: boolean }>) {
+function EducationSection({ document, taxonomy, mutate, pending }: Readonly<{ document: ProfileDocument; taxonomy: ProfileTaxonomyProjection | null; mutate: Mutate; pending: boolean }>) {
   const records = degrees(document);
   const sources = evidenceItems(document);
   const [editing, setEditing] = useState<ProfileDegree | null>(null);
@@ -761,7 +803,7 @@ function EducationSection({ document, mutate, pending }: Readonly<{ document: Pr
                 <div><dt>Country</dt><dd>{record.countryCode ?? "Not entered"}</dd></div>
                 <div><dt>GPA as entered</dt><dd>{record.gpaValue === null ? "Not entered" : `${record.gpaValue} / ${record.gpaScale}`}</dd></div>
               </dl>
-              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. {PROFILE_SEMANTIC_COPY.mapping.unavailable}</p>
+              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. <MappingLabelSummary document={document} taxonomy={taxonomy} recordId={record.degreeId} /></p>
               <div className="profile-inline-actions"><button className="secondary-button" type="button" disabled={pending} onClick={() => { setEditing(record); setShowForm(true); }}>Edit education</button><button className="text-danger-button" type="button" disabled={pending} onClick={() => setDeleteTarget(record)}>Delete</button></div>
             </article>
           );
@@ -858,7 +900,7 @@ function EducationForm({ document, record, sources, mutate, pending, onClose }: 
   );
 }
 
-function CoursesSection({ document, mutate, pending }: Readonly<{ document: ProfileDocument; mutate: Mutate; pending: boolean }>) {
+function CoursesSection({ document, taxonomy, mutate, pending }: Readonly<{ document: ProfileDocument; taxonomy: ProfileTaxonomyProjection | null; mutate: Mutate; pending: boolean }>) {
   const records = courses(document);
   const sources = evidenceItems(document);
   const education = degrees(document);
@@ -883,7 +925,7 @@ function CoursesSection({ document, mutate, pending }: Readonly<{ document: Prof
                 <div><dt>Credits as entered</dt><dd>{record.credits ?? "Not entered"}</dd></div>
                 <div><dt>Grade as entered</dt><dd>{record.gradeValue === null ? record.gradeText ?? "Not entered" : `${record.gradeValue} / ${record.gradeScale}${record.gradeText ? ` · ${record.gradeText}` : ""}`}</dd></div>
               </dl>
-              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. {PROFILE_SEMANTIC_COPY.mapping.unavailable}</p>
+              <p className="profile-card-note">Mapping readiness: {mapping?.mappingStatuses.join(", ") || "No mapping state"}. <MappingLabelSummary document={document} taxonomy={taxonomy} recordId={record.courseId} /></p>
               <div className="profile-inline-actions"><button className="secondary-button" type="button" disabled={pending} onClick={() => { setEditing(record); setShowForm(true); }}>Edit course</button><button className="text-danger-button" type="button" disabled={pending} onClick={() => setDeleteTarget(record)}>Delete</button></div>
             </article>
           );
@@ -1058,7 +1100,7 @@ function CompletenessCard({ scope, document, mutate, pending }: Readonly<{ scope
   );
 }
 
-function ReviewSection({ document, pending, onFreeze }: Readonly<{ document: ProfileDocument; pending: boolean; onFreeze(): void }>) {
+function ReviewSection({ document, taxonomy, pending, onFreeze }: Readonly<{ document: ProfileDocument; taxonomy: ProfileTaxonomyProjection | null; pending: boolean; onFreeze(): void }>) {
   const overview = profileOverview(document);
   const partial = overview.completenessScopes.filter((scope) => scope.completeness === "PARTIAL");
   const unknown = overview.completenessScopes.filter((scope) => scope.completeness === "UNKNOWN");
@@ -1079,9 +1121,9 @@ function ReviewSection({ document, pending, onFreeze }: Readonly<{ document: Pro
         {unknown.length > 0 ? <InlineNote>{unknown.length} scope{unknown.length === 1 ? " is" : "s are"} UNKNOWN. This warning does not itself block freeze.</InlineNote> : null}
         {missing.length > 0 ? <div className="profile-blocker" role="status">{missing.length} required declaration{missing.length === 1 ? " is" : "s are"} missing. The UI disables freeze for this authoritative reason.</div> : null}
       </article>
-      <article className="profile-section-card">
+      <article className="profile-section-card" data-testid="profile-mapping-readiness">
         <h3>Mapping readiness</h3>
-        {document.readiness.mappingReadiness.length === 0 ? <p>No Degree or Course mapping state is present.</p> : <div className="profile-review-scopes">{document.readiness.mappingReadiness.map((mapping) => <div key={`${mapping.recordType}-${mapping.recordId}`}><span>{mapping.recordType === "DEGREE" ? degreeLabel(document, mapping.recordId) : courses(document).find((course) => course.courseId === mapping.recordId)?.courseTitle ?? "Course record"}<small>{PROFILE_SEMANTIC_COPY.mapping.unavailable}</small></span><StatusPill value={mapping.verified ? "VERIFIED" : mapping.mappingStatuses[0] ?? "UNKNOWN"} /></div>)}</div>}
+        {document.readiness.mappingReadiness.length === 0 ? <p>No Degree or Course mapping state is present.</p> : <div className="profile-review-scopes">{document.readiness.mappingReadiness.map((mapping) => <div key={`${mapping.recordType}-${mapping.recordId}`}><span>{mapping.recordType === "DEGREE" ? degreeLabel(document, mapping.recordId) : courses(document).find((course) => course.courseId === mapping.recordId)?.courseTitle ?? "Course record"}<small><MappingLabelSummary document={document} taxonomy={taxonomy} recordId={mapping.recordId} /></small></span><StatusPill value={mapping.verified ? "VERIFIED" : mapping.mappingStatuses[0] ?? "UNKNOWN"} /></div>)}</div>}
         <p className="profile-card-note">{PROFILE_SEMANTIC_COPY.mapping.noInference}</p>
       </article>
       <article className="profile-freeze-card">
@@ -1094,6 +1136,21 @@ function ReviewSection({ document, pending, onFreeze }: Readonly<{ document: Pro
       </article>
     </section>
   );
+}
+
+function MappingLabelSummary({ document, taxonomy, recordId }: Readonly<{
+  document: ProfileDocument;
+  taxonomy: ProfileTaxonomyProjection | null;
+  recordId: string;
+}>) {
+  const labels = mappingLabelsFor(document, taxonomy, recordId);
+  if (!taxonomy || labels.length === 0) return PROFILE_SEMANTIC_COPY.mapping.unavailable;
+  return labels.map((concept, index) => (
+    <span key={concept.conceptId} data-testid="profile-mapping-label">
+      {index > 0 ? "; " : ""}{concept.displayName} · {concept.conceptKind}
+      {!concept.activeAtRelease ? ` · ${PROFILE_SEMANTIC_COPY.mapping.historical} ${taxonomy.releaseCode}` : ""}
+    </span>
+  ));
 }
 
 function ReviewList({ title, items }: Readonly<{ title: string; items: readonly string[] }>) {

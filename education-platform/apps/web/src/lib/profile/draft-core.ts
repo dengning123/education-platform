@@ -1,4 +1,9 @@
-import type { ProfileCommandPayloads, ProfileDocument } from "./contracts";
+import type {
+  ProfileCommandPayloads,
+  ProfileDocument,
+  ProfileTaxonomyConcept,
+  ProfileTaxonomyProjection,
+} from "./contracts";
 import { PROFILE_SEMANTIC_COPY } from "./semantic-copy";
 
 export const PROFILE_DRAFT_SECTIONS = [
@@ -184,6 +189,21 @@ export function degreeLabel(document: ProfileDocument, degreeId: string | null):
 
 export function mappingReadinessFor(document: ProfileDocument, recordId: string) {
   return document.readiness.mappingReadiness.find((mapping) => mapping.recordId === recordId) ?? null;
+}
+
+export function mappingLabelsFor(
+  document: ProfileDocument,
+  taxonomy: ProfileTaxonomyProjection | null,
+  recordId: string,
+): readonly ProfileTaxonomyConcept[] {
+  if (!taxonomy) return Object.freeze([]);
+  const conceptIds = new Set(
+    document.mappings
+      .filter((mapping) => mapping.recordId === recordId)
+      .map((mapping) => mapping.conceptId)
+      .filter((conceptId): conceptId is string => typeof conceptId === "string"),
+  );
+  return Object.freeze(taxonomy.concepts.filter((concept) => conceptIds.has(concept.conceptId)));
 }
 
 export function evidenceUpdatePayload(item: ProfileEvidenceItem): ProfileCommandPayloads["EVIDENCE_UPDATE"] {

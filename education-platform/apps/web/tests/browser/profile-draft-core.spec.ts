@@ -116,6 +116,45 @@ test("student completes the narrow source, education, course, declaration, and i
   expect(browserRequests.some((entry) => /\/(?:rest|functions)\/v1\//.test(entry.url))).toBe(false);
 });
 
+test("mapping readiness renders only owner-scoped projected labels and marks historical concepts", async ({ page, request }) => {
+  await openDraft(page);
+  const seeded = await request.post(`${fakeAuthOrigin}/__test__/seed-taxonomy-readiness`, {
+    data: { email: "alice@example.test" },
+  });
+  expect(seeded.ok()).toBe(true);
+  const fixture = await seeded.json() as Readonly<{
+    historicalConceptId: string;
+    activeConceptId: string;
+    unrelatedConceptId: string;
+  }>;
+
+  await page.reload();
+  await expect(page.getByTestId("profile-draft-core")).toBeVisible();
+
+  await page.getByRole("button", { name: "Education", exact: true }).click();
+  await expect(page.getByText("Economics · FIELD · Historical at v0.2", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Mapping readiness: PROPOSED/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Courses", exact: true }).click();
+  await expect(page.getByText("Calculus · COURSE_CONCEPT", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Mapping readiness: VERIFIED/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Review & Freeze", exact: true }).click();
+  const readiness = page.getByTestId("profile-mapping-readiness");
+  await expect(readiness.getByText("Economics · FIELD · Historical at v0.2", { exact: true })).toBeVisible();
+  await expect(readiness.getByText("Calculus · COURSE_CONCEPT", { exact: true })).toBeVisible();
+  await expect(readiness.locator(".profile-status-pill.status-proposed")).toContainText("PROPOSED");
+  await expect(readiness.locator(".profile-status-pill.status-verified")).toContainText("VERIFIED");
+  await expect(readiness.getByText("Econometrics", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("searchbox")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /select taxonomy|search taxonomy/i })).toHaveCount(0);
+
+  const body = await page.locator("body").innerText();
+  expect(body).not.toContain(fixture.historicalConceptId);
+  expect(body).not.toContain(fixture.activeConceptId);
+  expect(body).not.toContain(fixture.unrelatedConceptId);
+});
+
 test("stale revision preserves the local form and requires explicit reconfirmation", async ({ page, request }) => {
   await openDraft(page);
   await page.getByRole("button", { name: "Sources", exact: true }).click();

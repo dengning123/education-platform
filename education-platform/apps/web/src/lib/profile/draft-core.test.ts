@@ -7,6 +7,7 @@ import {
   courseUpdatePayload,
   degreeUpdatePayload,
   evidenceUpdatePayload,
+  mappingLabelsFor,
   profileOverview,
   sourceDescription,
   type ProfileCourse,
@@ -89,6 +90,33 @@ describe("Profile Draft Core semantics", () => {
     expect(sourceDescription(selfReport)).toBe("Student-provided information; not externally verified.");
     expect(sourceDescription(transcript)).toBe("Information referenced from a transcript source.");
     expect(sourceDescription(transcript)).not.toContain("Officially verified");
+  });
+
+  it("joins only projected labels referenced by the selected record without a UUID label table", () => {
+    const recordId = id("60");
+    const activeConceptId = id("61");
+    const historicalConceptId = id("62");
+    const unrelatedConceptId = id("63");
+    const document = documentFixture({
+      mappings: [
+        { mappingId: id("64"), recordType: "DEGREE", recordId, conceptId: historicalConceptId, mappingStatus: "PROPOSED", evidenceId: null },
+        { mappingId: id("65"), recordType: "DEGREE", recordId, conceptId: activeConceptId, mappingStatus: "VERIFIED", evidenceId: null },
+      ],
+    });
+    const taxonomy = {
+      schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022" as const,
+      releaseCode: "v0.2",
+      releaseOrdinal: 2,
+      concepts: [
+        { conceptId: activeConceptId, canonicalKey: "COURSE_CONCEPT.CALCULUS", conceptKind: "COURSE_CONCEPT" as const, displayName: "Calculus", activeAtRelease: true },
+        { conceptId: historicalConceptId, canonicalKey: "FIELD.ECONOMICS", conceptKind: "FIELD" as const, displayName: "Economics", activeAtRelease: false },
+        { conceptId: unrelatedConceptId, canonicalKey: "SUBFIELD.ECONOMETRICS", conceptKind: "SUBFIELD" as const, displayName: "Econometrics", activeAtRelease: true },
+      ],
+    };
+
+    expect(mappingLabelsFor(document, taxonomy, recordId)).toEqual(taxonomy.concepts.slice(0, 2));
+    expect(mappingLabelsFor(document, taxonomy, id("66"))).toEqual([]);
+    expect(mappingLabelsFor(document, null, recordId)).toEqual([]);
   });
 });
 

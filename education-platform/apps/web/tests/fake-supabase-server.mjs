@@ -55,6 +55,7 @@ function newDraft(versionNumber) {
     goals: [],
     preferences: [],
     mappings: [],
+    taxonomyProjection: null,
     completeness: new Map(),
   };
 }
@@ -84,9 +85,15 @@ function readiness(profile) {
     if (declaration) declarations.push(declaration);
     else missingDeclarations.push(scope);
   }
+  const mappingReadinessEntry = (recordType, recordId) => {
+    const mappingStatuses = profile.mappings
+      .filter((mapping) => mapping.recordType === recordType && mapping.recordId === recordId)
+      .map((mapping) => mapping.mappingStatus);
+    return { recordType, recordId, verified: mappingStatuses.includes("VERIFIED"), mappingStatuses };
+  };
   const mappingReadiness = [
-    ...profile.degrees.map((degree) => ({ recordType: "DEGREE", recordId: degree.degreeId, verified: false, mappingStatuses: [] })),
-    ...profile.courses.map((course) => ({ recordType: "COURSE", recordId: course.courseId, verified: false, mappingStatuses: [] })),
+    ...profile.degrees.map((degree) => mappingReadinessEntry("DEGREE", degree.degreeId)),
+    ...profile.courses.map((course) => mappingReadinessEntry("COURSE", course.courseId)),
   ];
   return {
     schemaVersion: "PROFILE_READINESS_V019",
@@ -328,6 +335,38 @@ const server = createServer(async (request, response) => {
     send(response, 200, { ok: true, revision: state.draft.revision });
     return;
   }
+  if (url.pathname === "/__test__/seed-taxonomy-readiness" && request.method === "POST") {
+    const body = await jsonBody(request);
+    const user = users.get(String(body.email ?? "").toLowerCase());
+    const state = user ? profileState(user) : null;
+    if (!state?.draft) return send(response, 404, { ok: false });
+
+    const evidenceId = nextId();
+    const degreeId = nextId();
+    const courseId = nextId();
+    const historicalConceptId = nextId();
+    const activeConceptId = nextId();
+    const unrelatedConceptId = nextId();
+    state.draft.evidenceItems.push({ evidenceId, evidenceType: "TRANSCRIPT", locator: "taxonomy fixture", contentHash: null, observedAt: now });
+    state.draft.degrees.push({ degreeId, institutionName: "Taxonomy University", degreeName: "Bachelor of Science", degreeLevel: "BACHELORS", degreeStatus: "COMPLETED", startDate: null, completionDate: null, countryCode: "US", gpaValue: null, gpaScale: null, evidenceId });
+    state.draft.courses.push({ courseId, degreeId, courseCode: "MATH-101", courseTitle: "Calculus I", courseStatus: "COMPLETED", term: null, completionDate: null, credits: null, gradeValue: null, gradeScale: null, gradeText: null, evidenceId });
+    state.draft.mappings.push(
+      { mappingId: nextId(), recordType: "DEGREE", recordId: degreeId, conceptId: historicalConceptId, mappingStatus: "PROPOSED", evidenceId: null },
+      { mappingId: nextId(), recordType: "COURSE", recordId: courseId, conceptId: activeConceptId, mappingStatus: "VERIFIED", evidenceId: null },
+    );
+    state.draft.taxonomyProjection = {
+      schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022",
+      releaseCode: "v0.2",
+      releaseOrdinal: 2,
+      concepts: [
+        { conceptId: activeConceptId, canonicalKey: "COURSE_CONCEPT.CALCULUS", conceptKind: "COURSE_CONCEPT", displayName: "Calculus", activeAtRelease: true },
+        { conceptId: historicalConceptId, canonicalKey: "FIELD.ECONOMICS", conceptKind: "FIELD", displayName: "Economics", activeAtRelease: false },
+        { conceptId: unrelatedConceptId, canonicalKey: "SUBFIELD.ECONOMETRICS", conceptKind: "SUBFIELD", displayName: "Econometrics", activeAtRelease: true },
+      ],
+    };
+    send(response, 200, { ok: true, degreeId, courseId, historicalConceptId, activeConceptId, unrelatedConceptId });
+    return;
+  }
 
   if (request.headers.apikey !== publicKey) {
     send(response, 401, { message: "Public key required" });
@@ -427,7 +466,7 @@ const server = createServer(async (request, response) => {
       const requested = body.p_profile_version_id;
       const profile = requested === null || requested === undefined ? state.draft : state.draft?.id === requested ? state.draft : state.frozen.get(requested);
       if (!profile) return rpcError(response, 404, "PROFILE_NOT_FOUND", "P0002");
-      send(response, 200, {
+      send(response, 200, profile.taxonomyProjection ?? {
         schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022",
         releaseCode: "v0.1",
         releaseOrdinal: 1,

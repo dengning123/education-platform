@@ -24,7 +24,8 @@ export const PROFILE_SEMANTIC_COPY = Object.freeze({
   mapping: Object.freeze({
     readiness: "Mapping readiness is separate from completeness and cannot be changed here.",
     noInference: "Mapping readiness is displayed separately and is not used by this UI to infer completeness.",
-    unavailable: "Concept label unavailable in current MVP.",
+    unavailable: "No projected concept label is available for this record.",
+    historical: "Historical at",
   }),
   conflict: Object.freeze({
     revisionTitle: "Review the latest version before saving again.",
