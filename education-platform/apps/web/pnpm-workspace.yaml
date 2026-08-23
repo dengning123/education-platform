@@ -1,0 +1,7 @@
+packages:
+  - "."
+
+# Reviewed transitive native resolver used by eslint-config-next.
+# Only this exact package/version may run its package-selection postinstall.
+allowBuilds:
+  unrs-resolver@1.12.2: true
