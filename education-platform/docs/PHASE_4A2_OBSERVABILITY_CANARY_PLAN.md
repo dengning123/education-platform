@@ -33,7 +33,7 @@ evidence is recorded in the Phase 4A-2.1 review linked above. The work did not:
   database migration;
 - modify migrations `001`–`018`, the frozen Fit runtime, evaluator identity,
   Eligibility/Fit/Financial semantics, or response schemas;
-- start UI, Migration 019, Application/Outcome runtime, or Competitiveness;
+- start UI, Migration 020, Application/Outcome runtime, or Competitiveness;
 - print, export, or persist production log rows, request/response bodies,
   headers, IPs, claims, object IDs, or student-linked records;
 - run a synthetic request or database count gauge.
@@ -203,7 +203,7 @@ truthfully supply:
 
 Privacy-deletion attempt/success/integrity-failure alerts remain blocked until
 a separately authorized, privacy-safe source exists. Any durable receipt table
-would require a new additive migration after Migration 019 under the existing
+would require a new additive migration after Migration 020 under the existing
 umbrella plan; this document does not authorize it.
 
 ## 4. Metric contract
@@ -470,7 +470,7 @@ A future Phase 4A-2 implementation is releasable only if all are true:
 - canary alert delivery and rollback have been rehearsed;
 - rollback leaves all four Phase 4A-1 functions on one verified identity set;
 - migrations `001`–`018`, frozen runtime, semantic packages,
-  evaluator/fingerprint identity, UI, Migration 019, and Competitiveness have
+  evaluator/fingerprint identity, UI, Migration 020, and Competitiveness have
   no unauthorized diff.
 
 ## 11. Review decision and blockers

@@ -22,10 +22,11 @@ supabase db reset
 
 The golden record is a data migration, so `db reset` installs both the schema
 and its verified data. `supabase/config.toml` deliberately disables a separate
-seed file. The active migration directory contains migrations `001`–`018`.
-Migration `015` remains frozen; additive Migration `016` registers the reviewed
-Fit Engine v0.1 build and its service-only source projections, and Migration
-`017` adds the independently reviewed Financial normalization workflow.
+seed file. The active local migration directory contains migrations
+`001`–`019`; migrations `001`–`018` remain frozen. Additive Migration `019`
+provides the local-only Profile draft/readiness/freeze backend capability. It
+has not been deployed. The separately planned Application/Outcome contract is
+reserved for Migration `020` and remains unimplemented.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
 executor membership grant path; PostgreSQL 16+ uses the authorized
@@ -84,6 +85,10 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f supabase/migrations/202608220018_fit_v014_private_function_acl_hardening.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f supabase/tests/010_phase018_fit_v014_private_function_acl_hardening.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/202608230019_profile_draft_freeze_capability.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/011_phase019_profile_draft_freeze_capability.sql
 ```
 
 Tests `003`, `004`, and `005` are frozen baseline tests and intentionally run
@@ -113,6 +118,11 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f supabase/tests/_phase015_concurrency_probe.sql
 ```
+
+Migration `019` has independent populated-upgrade and concurrency probes. Run
+these only against disposable databases: the populated fixture commits a
+historical pre-019 Profile row, and the concurrency probe commits and cleans
+its own Auth/Profile fixtures.
 
 To typecheck and test the pure eligibility library:
 
@@ -291,8 +301,8 @@ The remaining production observability and minimum product-loop work is still
 planning-only in
 [docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md](docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_019_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 019 SQL, Application/Outcome runtime, or Competitiveness model is
+[docs/MIGRATION_020_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_020_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 020 SQL, Application/Outcome runtime, or Competitiveness model is
 implemented or authorized by those documents.
 The independent plan disposition is recorded in
-[docs/PHASE_4_AND_MIGRATION_019_PLAN_REVIEW.md](docs/PHASE_4_AND_MIGRATION_019_PLAN_REVIEW.md).
+[docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md](docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md).
