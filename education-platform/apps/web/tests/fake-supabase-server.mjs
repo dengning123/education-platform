@@ -475,6 +475,33 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (rpc === "get_profile_taxonomy_options_v023") {
+      const conceptKind = body.p_concept_kind;
+      const options = conceptKind === "ASSESSMENT"
+        ? [
+            { conceptId: "10000000-0000-0000-0000-000000000072", canonicalKey: "ASSESSMENT.GMAT", displayName: "GMAT" },
+            { conceptId: "10000000-0000-0000-0000-000000000071", canonicalKey: "ASSESSMENT.GRE", displayName: "GRE" },
+            { conceptId: "10000000-0000-0000-0000-000000000074", canonicalKey: "ASSESSMENT.IELTS", displayName: "IELTS" },
+            { conceptId: "10000000-0000-0000-0000-000000000073", canonicalKey: "ASSESSMENT.TOEFL", displayName: "TOEFL" },
+          ]
+        : conceptKind === "SKILL"
+          ? [
+              { conceptId: "10000000-0000-0000-0000-000000000041", canonicalKey: "SKILL.PYTHON", displayName: "Python" },
+              { conceptId: "10000000-0000-0000-0000-000000000042", canonicalKey: "SKILL.R", displayName: "R" },
+              { conceptId: "10000000-0000-0000-0000-000000000043", canonicalKey: "SKILL.SQL", displayName: "SQL" },
+            ]
+          : null;
+      if (!options) return rpcError(response, 422, "PROFILE_TAXONOMY_KIND_NOT_ALLOWED", "22023");
+      send(response, 200, {
+        schemaVersion: "PROFILE_TAXONOMY_OPTIONS_V023",
+        releaseCode: "v0.1",
+        releaseOrdinal: 1,
+        conceptKind,
+        options,
+      });
+      return;
+    }
+
     if (rpc === "mutate_profile_draft_v019") {
       if (!state.draft || state.draft.id !== body.p_profile_version_id) return rpcError(response, 404, "PROFILE_NOT_FOUND", "P0002");
       const operationId = String(body.p_operation_id ?? "");

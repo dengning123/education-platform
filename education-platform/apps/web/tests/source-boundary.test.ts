@@ -43,11 +43,13 @@ describe("frontend source boundary", () => {
     }
   });
 
-  it("keeps taxonomy projection behind the existing session-scoped Profile route", async () => {
+  it("keeps taxonomy projection and bounded options behind the existing session-scoped Profile route", async () => {
     const service = await readFile(join(root, "src/lib/profile/service.ts"), "utf8");
     const boundary = await readFile(join(root, "src/lib/profile/http-boundary.ts"), "utf8");
     expect(service).toContain('this.rpc("get_profile_taxonomy_projection_v022"');
+    expect(service).toContain('this.rpc("get_profile_taxonomy_options_v023"');
     expect(service).toContain("parseProfileTaxonomyProjection");
+    expect(service).toContain("parseProfileTaxonomyOptions");
     expect(boundary).toContain('"taxonomy"');
     expect(boundary).toContain("parseTaxonomyRequest");
     expect(service).not.toMatch(/service.?role|management.?token|database.?password/i);

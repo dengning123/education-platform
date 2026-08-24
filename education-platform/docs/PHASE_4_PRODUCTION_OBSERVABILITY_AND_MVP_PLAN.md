@@ -9,7 +9,7 @@ Frozen baseline: commit `55296e1aeca9a25b066e9010c376f0e618af59d1`,
 tag `phase3-fit-v0.1`
 
 Related data-contract plan:
-[`MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md)
+[`MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md)
 
 ## 1. Objective
 
@@ -22,7 +22,7 @@ usable product loop. It has two immediate workstreams:
    Eligibility, six-dimensional Fit, Financial review, and privacy deletion.
 
 Application tracking and verified outcome collection join the product loop
-only after the separately reviewed provisional Migration 023 contract is
+only after the separately reviewed provisional Migration 024 contract is
 implemented under separate authorization.
 
 Phase 4 does not change the frozen meanings of Eligibility or Fit. It does not
@@ -90,10 +90,10 @@ functions and every new Phase 4 endpoint. It must provide:
 
 The first observability implementation is service-level. Migration 019 is the
 Profile backend core, Migration 020 is the Frozen Profile to new DRAFT fork,
-Migration 021 is the hosted Auth subject compatibility repair, and Migration
-022 is the owner-scoped Profile taxonomy projection. The Application/Outcome
-plan now has a provisional future Migration 023 identity. Taxonomy 022 remains
-uncommitted, paused, and not baseline-ready;
+Migration 021 is the hosted Auth subject compatibility repair, Migration 022
+is the owner-scoped Profile taxonomy projection, and Migration 023 is the
+bounded ASSESSMENT/SKILL taxonomy options capability. The Application/Outcome
+plan now has a provisional future Migration 024 identity;
 that number remains provisional until implementation authorization. Any
 durable database operation receipt or trace table requires a separate additive
 migration after the implemented Application/Outcome migration.
@@ -258,7 +258,7 @@ Authenticated student
 → independent reviewer verifies or rejects
 → student resumes the same evaluation
 → inspect six categorical Fit dimensions and evidence limitations
-→ optionally create an application record after provisional Migration 023
+→ optionally create an application record after provisional Migration 024
 → export or delete student data
 ```
 
@@ -273,7 +273,7 @@ Authenticated student
 7. Fit result with exactly six dimension cards.
 8. Financial normalization pending/reviewed/resumed state.
 9. Privacy/export controls.
-10. Application tracker and outcome reporting only after provisional Migration 023.
+10. Application tracker and outcome reporting only after provisional Migration 024.
 
 ### 4.3 Result presentation rules
 
@@ -309,7 +309,7 @@ New API surface is grouped by capability rather than one endpoint per table:
 - Eligibility v0.2 evaluation orchestration;
 - the existing Fit and Financial endpoints;
 - privacy export/deletion orchestration;
-- Application/Outcome commands after provisional Migration 023.
+- Application/Outcome commands after provisional Migration 024.
 
 ### 4.5 Reviewer flow
 
@@ -365,9 +365,9 @@ The reviewer experience is separate from the student experience. It must:
 
 ### Gate D — Application/Outcome enablement
 
-- Migration 023 receives independent design approval and implementation
+- Migration 024 receives independent design approval and implementation
   authorization;
-- clean `001→023`, populated `022→023`, RLS, concurrency, privacy, and remote
+- clean `001→024`, populated `023→024`, RLS, concurrency, privacy, and remote
   smoke gates pass;
 - outcome evidence/reviewer policy and research-consent copy are approved;
 - no Competitiveness training or inference job exists.

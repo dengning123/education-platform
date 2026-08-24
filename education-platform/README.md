@@ -23,14 +23,15 @@ supabase db reset
 The golden record is a data migration, so `db reset` installs both the schema
 and its verified data. `supabase/config.toml` deliberately disables a separate
 seed file. The active local migration directory contains migrations
-`001`–`022`; migrations `001`–`018` remain frozen. Additive Migration `019`
+`001`–`023`; migrations `001`–`018` remain frozen. Additive Migration `019`
 provides the local-only Profile draft/readiness/freeze backend capability, and
 Migration `020` adds the local-only Frozen Profile to new DRAFT fork. Migration
 `021` repairs hosted Auth subject extraction without expanding Auth ACLs, and
 Migration `022` adds the local-only owner-scoped Profile taxonomy label
-projection but remains paused and not baseline-ready. None of `019`–`022` has
+projection. Migration `023` adds local-only bounded ASSESSMENT/SKILL taxonomy
+options. None of `019`–`023` has
 been deployed. The separately planned
-Application/Outcome contract has a provisional future Migration `023` identity and remains
+Application/Outcome contract has a provisional future Migration `024` identity and remains
 unimplemented pending separate implementation authorization.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
@@ -231,6 +232,16 @@ requires one separate frozen `AVAILABLE_FUNDING` intent on the same signal.
     correction that removes implicit external EXECUTE from exactly 13 v014
     private helper/guard functions while retaining the evaluator owner and the
     hosted platform default ACL. It changes no v014–v017 business semantics.
+19. `202608230019_profile_draft_freeze_capability.sql` — owner-scoped
+    Profile DRAFT, readiness, mutation, and freeze capability.
+20. `202608230020_profile_frozen_fork_capability.sql` — idempotent
+    Frozen Profile to new DRAFT graph fork.
+21. `202608230021_profile_hosted_auth_subject_compatibility.sql` — trusted
+    PostgREST request-subject bridge without hosted `auth` schema grants.
+22. `202608230022_profile_taxonomy_projection.sql` — owner-scoped labels for
+    referenced FIELD, SUBFIELD, and COURSE_CONCEPT mappings.
+23. `202608230023_profile_taxonomy_options.sql` — authenticated, bounded
+    ASSESSMENT/SKILL options from the highest VERIFIED taxonomy release.
 
 ## Rules for data changes
 
@@ -306,9 +317,9 @@ The remaining production observability and minimum product-loop work is still
 planning-only in
 [docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md](docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 023 SQL, Application/Outcome runtime, or Competitiveness model is
-implemented or authorized by those documents. The 023 number remains
+[docs/MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 024 SQL, Application/Outcome runtime, or Competitiveness model is
+implemented or authorized by those documents. The 024 number remains
 provisional until implementation authorization.
 The original Migration 020 plan disposition is preserved as historical
 provenance in

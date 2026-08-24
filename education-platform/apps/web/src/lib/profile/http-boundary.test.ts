@@ -6,6 +6,7 @@ import type {
   ProfileMutationCommand,
   ProfileOperationResult,
   ProfileReadiness,
+  ProfileTaxonomyOptions,
   ProfileTaxonomyProjection,
 } from "./contracts";
 import { ProfileServiceError } from "./errors";
@@ -43,6 +44,17 @@ const taxonomy: ProfileTaxonomyProjection = {
   releaseCode: "v0.1",
   releaseOrdinal: 1,
   concepts: [],
+};
+const taxonomyOptions: ProfileTaxonomyOptions = {
+  schemaVersion: "PROFILE_TAXONOMY_OPTIONS_V023",
+  releaseCode: "v0.1",
+  releaseOrdinal: 1,
+  conceptKind: "ASSESSMENT",
+  options: [{
+    conceptId: "10000000-0000-0000-0000-000000000071",
+    canonicalKey: "ASSESSMENT.GRE",
+    displayName: "GRE",
+  }],
 };
 
 class MockProfileService implements ProfileService {
@@ -88,6 +100,12 @@ class MockProfileService implements ProfileService {
     this.fail();
     this.calls.push({ method: "taxonomy", input });
     return taxonomy;
+  }
+
+  async taxonomyOptions(input: "ASSESSMENT" | "SKILL"): Promise<ProfileTaxonomyOptions> {
+    this.fail();
+    this.calls.push({ method: "taxonomyOptions", input });
+    return { ...taxonomyOptions, conceptKind: input };
   }
 
   async mutate(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number } & ProfileMutationCommand>): Promise<ProfileOperationResult> {
@@ -233,19 +251,31 @@ describe("Profile HTTP boundary", () => {
     expect(studentIdAttempt.status).toBe(422);
   });
 
-  it("accepts only an optional Profile version for owner-scoped taxonomy projection", async () => {
+  it("accepts only the closed projection and bounded-option taxonomy operations", async () => {
     const service = new MockProfileService();
     const handler = router(service);
     const current = await handler(request("{}"), context("taxonomy"));
     const explicit = await handler(request(JSON.stringify({ profileVersionId: profileId })), context("taxonomy"));
+    const namedProjection = await handler(request(JSON.stringify({ operation: "projection", profileVersionId: profileId })), context("taxonomy"));
+    const assessmentOptions = await handler(request(JSON.stringify({ operation: "options", conceptKind: "ASSESSMENT" })), context("taxonomy"));
+    const skillOptions = await handler(request(JSON.stringify({ operation: "options", conceptKind: "SKILL" })), context("taxonomy"));
     const enumeration = await handler(request(JSON.stringify({ profileVersionId: profileId, conceptIds: [operationId] })), context("taxonomy"));
     const ownership = await handler(request(JSON.stringify({ studentId: profileId })), context("taxonomy"));
+    const arbitraryKind = await handler(request(JSON.stringify({ operation: "options", conceptKind: "FIELD" })), context("taxonomy"));
+    const optionsOwnership = await handler(request(JSON.stringify({ operation: "options", conceptKind: "SKILL", studentId: profileId })), context("taxonomy"));
     expect(current.status).toBe(200);
     expect(explicit.status).toBe(200);
+    expect(namedProjection.status).toBe(200);
+    expect(assessmentOptions.status).toBe(200);
+    expect(skillOptions.status).toBe(200);
     expect(service.calls).toContainEqual({ method: "taxonomy", input: null });
     expect(service.calls).toContainEqual({ method: "taxonomy", input: profileId });
+    expect(service.calls).toContainEqual({ method: "taxonomyOptions", input: "ASSESSMENT" });
+    expect(service.calls).toContainEqual({ method: "taxonomyOptions", input: "SKILL" });
     expect(enumeration.status).toBe(422);
     expect(ownership.status).toBe(422);
+    expect(arbitraryKind.status).toBe(422);
+    expect(optionsOwnership.status).toBe(422);
   });
 
   it("maps active-draft and cross-owner/not-found service outcomes without leakage", async () => {

@@ -189,7 +189,9 @@ async function executeCapability(capability: ProfileCapability, body: unknown, s
     }
     case "taxonomy": {
       const input = parseTaxonomyRequest(body);
-      return service.taxonomy(input.profileVersionId);
+      return input.operation === "options"
+        ? service.taxonomyOptions(input.conceptKind)
+        : service.taxonomy(input.profileVersionId);
     }
     case "mutate":
       return service.mutate(parseMutationRequest(body));

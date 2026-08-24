@@ -136,6 +136,29 @@ test("an authenticated Profile draft reaches only the same-origin Next boundary"
     data: expect.objectContaining({ schemaVersion: "PROFILE_TAXONOMY_PROJECTION_V022", releaseCode: "v0.1" }),
   }));
   expect(taxonomy.requestId).toBe(taxonomy.body.requestId);
+  const assessmentOptions = await profilePost(page, "taxonomy", {
+    operation: "options",
+    conceptKind: "ASSESSMENT",
+  });
+  expect(assessmentOptions.status).toBe(200);
+  expect(assessmentOptions.body).toEqual(expect.objectContaining({
+    data: {
+      schemaVersion: "PROFILE_TAXONOMY_OPTIONS_V023",
+      releaseCode: "v0.1",
+      releaseOrdinal: 1,
+      conceptKind: "ASSESSMENT",
+      options: expect.arrayContaining([
+        expect.objectContaining({ canonicalKey: "ASSESSMENT.TOEFL", displayName: "TOEFL" }),
+        expect.objectContaining({ canonicalKey: "ASSESSMENT.IELTS", displayName: "IELTS" }),
+      ]),
+    },
+  }));
+  const disallowedOptions = await profilePost(page, "taxonomy", {
+    operation: "options",
+    conceptKind: "FIELD",
+  });
+  expect(disallowedOptions.status).toBe(422);
+  expect(disallowedOptions.body).toEqual(expect.objectContaining({ error: "INVALID_REQUEST" }));
 
   expect(requests.some((url) => /\/api\/profile\//.test(url))).toBe(true);
   expect(requests.some((url) => /\/rest\/v1\/rpc\//.test(url))).toBe(false);

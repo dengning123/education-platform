@@ -323,15 +323,22 @@ Ranking, probability, recommendation, and Competitiveness remain unimplemented.
 The next planning milestone is Phase 4 production observability and a minimum
 authenticated product loop; see
 [`PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md`](PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
-The separately bounded provisional Migration 023 Application/Outcome proposal is recorded
+The separately bounded provisional Migration 024 Application/Outcome proposal is recorded
 in
-[`MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_023_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+[`MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
 Its migration number remains provisional until implementation authorization.
-No Migration 023 SQL or Competitiveness implementation exists. Migration 021
-is limited to hosted Auth subject compatibility, and Migration 022 is limited
-to the owner-scoped Profile taxonomy label projection and remains paused and
-not baseline-ready. Neither authorizes Application/Outcome or Competitiveness
+No Migration 024 SQL or Competitiveness implementation exists. Migration 021
+is limited to hosted Auth subject compatibility, Migration 022 is limited to
+the owner-scoped Profile taxonomy label projection, and Migration 023 is
+limited to bounded ASSESSMENT/SKILL taxonomy options. None authorizes
+Application/Outcome or Competitiveness
 behavior.
+
+Migration 023 does not authorize a Tests/Skills editor. Assessment-specific
+section semantics, VERIFIED-active mutation admissibility, historical
+ASSESSMENT/SKILL projection, and taxonomy coverage remain UI blockers that
+must be closed by database contracts; frontend filtering is not an authority
+substitute.
 
 Do not implement the full future architecture now. Add no speculative tables,
 services, matching engines, or model pipelines merely because they appear in

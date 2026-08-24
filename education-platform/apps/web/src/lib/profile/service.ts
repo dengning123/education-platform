@@ -7,12 +7,15 @@ import {
   parseProfileDocument,
   parseProfileOperationResult,
   parseProfileReadiness,
+  parseProfileTaxonomyOptions,
   parseProfileTaxonomyProjection,
   type ProfileAccount,
   type ProfileDocument,
   type ProfileMutationCommand,
   type ProfileOperationResult,
   type ProfileReadiness,
+  type ProfileTaxonomyOptionKind,
+  type ProfileTaxonomyOptions,
   type ProfileTaxonomyProjection,
 } from "@/lib/profile/contracts";
 import { mapProfileRpcError, ProfileServiceError } from "@/lib/profile/errors";
@@ -25,6 +28,7 @@ export interface ProfileService {
   currentDocument(): Promise<ProfileDocument>;
   readiness(profileVersionId: string): Promise<ProfileReadiness>;
   taxonomy(profileVersionId: string | null): Promise<ProfileTaxonomyProjection>;
+  taxonomyOptions(conceptKind: ProfileTaxonomyOptionKind): Promise<ProfileTaxonomyOptions>;
   mutate(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number } & ProfileMutationCommand>): Promise<ProfileOperationResult>;
   freeze(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }>): Promise<ProfileOperationResult>;
   fork(input: Readonly<{ sourceProfileVersionId: string; operationId: string }>): Promise<ProfileOperationResult>;
@@ -96,6 +100,10 @@ class SupabaseProfileService implements ProfileService {
 
   async taxonomy(profileVersionId: string | null): Promise<ProfileTaxonomyProjection> {
     return parseProfileTaxonomyProjection(await this.rpc("get_profile_taxonomy_projection_v022", { p_profile_version_id: profileVersionId }));
+  }
+
+  async taxonomyOptions(conceptKind: ProfileTaxonomyOptionKind): Promise<ProfileTaxonomyOptions> {
+    return parseProfileTaxonomyOptions(await this.rpc("get_profile_taxonomy_options_v023", { p_concept_kind: conceptKind }));
   }
 
   async mutate(input: Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number } & ProfileMutationCommand>): Promise<ProfileOperationResult> {

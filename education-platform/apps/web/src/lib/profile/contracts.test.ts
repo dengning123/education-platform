@@ -12,6 +12,7 @@ import {
   parseProfileDocument,
   parseProfileMutationCommand,
   parseProfileOperationResult,
+  parseProfileTaxonomyOptions,
   parseProfileTaxonomyProjection,
   parseTaxonomyRequest,
 } from "./contracts";
@@ -158,8 +159,9 @@ describe("Profile taxonomy projection contract", () => {
 
   it("accepts the exact deterministic capability DTO and optional owner Profile input", () => {
     expect(parseProfileTaxonomyProjection(projection)).toEqual(projection);
-    expect(parseTaxonomyRequest({})).toEqual({ profileVersionId: null });
-    expect(parseTaxonomyRequest({ profileVersionId: id("30") })).toEqual({ profileVersionId: id("30") });
+    expect(parseTaxonomyRequest({})).toEqual({ operation: "projection", profileVersionId: null });
+    expect(parseTaxonomyRequest({ profileVersionId: id("30") })).toEqual({ operation: "projection", profileVersionId: id("30") });
+    expect(parseTaxonomyRequest({ operation: "projection", profileVersionId: id("30") })).toEqual({ operation: "projection", profileVersionId: id("30") });
   });
 
   it("rejects extra catalog fields, disallowed kinds, duplicates, and nondeterministic order", () => {
@@ -174,5 +176,57 @@ describe("Profile taxonomy projection contract", () => {
     expect(() => parseTaxonomyRequest({ studentId: id("31") })).toThrow("INVALID_REQUEST");
     expect(() => parseTaxonomyRequest({ conceptIds: [id("40")] })).toThrow("INVALID_REQUEST");
     expect(() => parseTaxonomyRequest({ profileVersionId: "not-a-uuid" })).toThrow("INVALID_REQUEST");
+  });
+});
+
+describe("Profile bounded taxonomy options contract", () => {
+  const options = [
+    { conceptId: id("50"), canonicalKey: "ASSESSMENT.GMAT", displayName: "GMAT" },
+    { conceptId: id("51"), canonicalKey: "ASSESSMENT.GRE", displayName: "GRE" },
+  ];
+  const response = {
+    schemaVersion: "PROFILE_TAXONOMY_OPTIONS_V023",
+    releaseCode: "v0.1",
+    releaseOrdinal: 1,
+    conceptKind: "ASSESSMENT",
+    options,
+  };
+
+  it("accepts only ASSESSMENT/SKILL option requests and the exact closed DTO", () => {
+    expect(parseProfileTaxonomyOptions(response)).toEqual(response);
+    expect(parseProfileTaxonomyOptions({
+      ...response,
+      options: [{
+        conceptId: "10000000-0000-0000-0000-000000000072",
+        canonicalKey: "ASSESSMENT.GMAT",
+        displayName: "GMAT",
+      }],
+    }).options[0]?.conceptId).toBe("10000000-0000-0000-0000-000000000072");
+    expect(parseTaxonomyRequest({ operation: "options", conceptKind: "ASSESSMENT" })).toEqual({ operation: "options", conceptKind: "ASSESSMENT" });
+    expect(parseTaxonomyRequest({ operation: "options", conceptKind: "SKILL" })).toEqual({ operation: "options", conceptKind: "SKILL" });
+  });
+
+  it("rejects unknown kinds, ownership/search inputs, catalog fields, and retired-option flags", () => {
+    expect(() => parseTaxonomyRequest({ operation: "options", conceptKind: "FIELD" })).toThrow("INVALID_REQUEST");
+    expect(() => parseTaxonomyRequest({ operation: "options", conceptKind: "SKILL", studentId: id("52") })).toThrow("INVALID_REQUEST");
+    expect(() => parseTaxonomyRequest({ operation: "options", conceptKind: "SKILL", query: "py" })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({ ...response, aliases: [] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({ ...response, options: [{ ...options[0], activeAtRelease: true }] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({ ...response, options: [{ ...options[0], description: "internal" }] })).toThrow("INVALID_REQUEST");
+  });
+
+  it("rejects wrong-kind, duplicate, nondeterministic, oversized, and over-count results", () => {
+    expect(() => parseProfileTaxonomyOptions({ ...response, options: [{ ...options[0], canonicalKey: "SKILL.PYTHON" }] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({ ...response, options: [options[1], options[0]] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({ ...response, options: [options[0], { ...options[1], conceptId: options[0].conceptId }] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({ ...response, options: [{ ...options[0], displayName: "x".repeat(257) }] })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileTaxonomyOptions({
+      ...response,
+      options: Array.from({ length: 65 }, (_, index) => ({
+        conceptId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        canonicalKey: `ASSESSMENT.OPTION_${String(index + 1).padStart(3, "0")}`,
+        displayName: `Option ${index + 1}`,
+      })),
+    })).toThrow("INVALID_REQUEST");
   });
 });

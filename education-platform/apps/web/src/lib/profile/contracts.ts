@@ -1,4 +1,5 @@
 export const PROFILE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const POSTGRES_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -31,6 +32,10 @@ export const PROFILE_GOAL_TYPES = ["CAREER", "INDUSTRY", "FIELD", "OTHER"] as co
 export const PROFILE_PREFERENCE_TYPES = ["LOCATION", "DELIVERY_MODE", "BUDGET", "PROGRAM_LENGTH"] as const;
 export const PROFILE_MAPPING_STATUSES = ["PROPOSED", "VERIFIED", "REJECTED", "RETIRED"] as const;
 export const PROFILE_TAXONOMY_CONCEPT_KINDS = ["FIELD", "SUBFIELD", "COURSE_CONCEPT"] as const;
+export const PROFILE_TAXONOMY_OPTION_KINDS = ["ASSESSMENT", "SKILL"] as const;
+export const PROFILE_TAXONOMY_OPTION_LIMIT = 64;
+export const PROFILE_TAXONOMY_CANONICAL_KEY_MAX_BYTES = 128;
+export const PROFILE_TAXONOMY_DISPLAY_NAME_MAX_BYTES = 256;
 export const PROFILE_SECTION_SCORE_KEYS = [
   "quantitative",
   "verbal",
@@ -243,6 +248,11 @@ function uuid(value: unknown): string {
   return value.toLowerCase();
 }
 
+function postgresUuid(value: unknown): string {
+  if (typeof value !== "string" || !POSTGRES_UUID_PATTERN.test(value)) invalid();
+  return value.toLowerCase();
+}
+
 function textValue(value: unknown): string {
   if (typeof value !== "string") invalid();
   return value;
@@ -450,6 +460,22 @@ export type ProfileTaxonomyProjection = Readonly<{
   releaseOrdinal: number;
   concepts: readonly ProfileTaxonomyConcept[];
 }>;
+export type ProfileTaxonomyOptionKind = (typeof PROFILE_TAXONOMY_OPTION_KINDS)[number];
+export type ProfileTaxonomyOption = Readonly<{
+  conceptId: string;
+  canonicalKey: string;
+  displayName: string;
+}>;
+export type ProfileTaxonomyOptions = Readonly<{
+  schemaVersion: "PROFILE_TAXONOMY_OPTIONS_V023";
+  releaseCode: string;
+  releaseOrdinal: number;
+  conceptKind: ProfileTaxonomyOptionKind;
+  options: readonly ProfileTaxonomyOption[];
+}>;
+export type ProfileTaxonomyRequest =
+  | Readonly<{ operation: "projection"; profileVersionId: string | null }>
+  | Readonly<{ operation: "options"; conceptKind: ProfileTaxonomyOptionKind }>;
 
 type ClosedField = Readonly<{ key: string; kind: "boolean" | "enum" | "integer" | "nullableHash" | "nullableInteger" | "nullableNumber" | "nullableString" | "nullableUuid" | "number" | "object" | "string" | "uuid"; values?: readonly string[] }>;
 
@@ -612,6 +638,76 @@ export function parseProfileTaxonomyProjection(value: unknown): ProfileTaxonomyP
   });
 }
 
+function boundedTaxonomyText(value: unknown, maxBytes: number): string {
+  const result = textValue(value);
+  if (
+    result.trim() === ""
+    || new TextEncoder().encode(result).byteLength > maxBytes
+  ) invalid();
+  return result;
+}
+
+export function parseProfileTaxonomyOptions(value: unknown): ProfileTaxonomyOptions {
+  const object = closedResponseObject(
+    value,
+    ["schemaVersion", "releaseCode", "releaseOrdinal", "conceptKind", "options"],
+  );
+  if (object.schemaVersion !== "PROFILE_TAXONOMY_OPTIONS_V023") invalid();
+  const releaseCode = boundedTaxonomyText(object.releaseCode, 32);
+  const releaseOrdinal = integer(object.releaseOrdinal);
+  const conceptKind = enumValue(
+    object.conceptKind,
+    PROFILE_TAXONOMY_OPTION_KINDS,
+  ) as ProfileTaxonomyOptionKind;
+  if (
+    !/^v[0-9]+\.[0-9]+$/.test(releaseCode)
+    || releaseOrdinal < 1
+    || !Array.isArray(object.options)
+    || object.options.length > PROFILE_TAXONOMY_OPTION_LIMIT
+  ) invalid();
+
+  const conceptIds = new Set<string>();
+  const canonicalKeys = new Set<string>();
+  let previousSortKey: string | null = null;
+  const options = object.options.map((entry) => {
+    const option = closedResponseObject(
+      entry,
+      ["conceptId", "canonicalKey", "displayName"],
+    );
+    const conceptId = postgresUuid(option.conceptId);
+    const canonicalKey = boundedTaxonomyText(
+      option.canonicalKey,
+      PROFILE_TAXONOMY_CANONICAL_KEY_MAX_BYTES,
+    );
+    const displayName = boundedTaxonomyText(
+      option.displayName,
+      PROFILE_TAXONOMY_DISPLAY_NAME_MAX_BYTES,
+    );
+    if (
+      !/^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)+$/.test(canonicalKey)
+      || !canonicalKey.startsWith(`${conceptKind}.`)
+    ) invalid();
+    const sortKey = `${canonicalKey}\u0000${conceptId}`;
+    if (
+      conceptIds.has(conceptId)
+      || canonicalKeys.has(canonicalKey)
+      || (previousSortKey !== null && previousSortKey >= sortKey)
+    ) invalid();
+    conceptIds.add(conceptId);
+    canonicalKeys.add(canonicalKey);
+    previousSortKey = sortKey;
+    return Object.freeze({ conceptId, canonicalKey, displayName });
+  });
+
+  return Object.freeze({
+    schemaVersion: "PROFILE_TAXONOMY_OPTIONS_V023",
+    releaseCode,
+    releaseOrdinal,
+    conceptKind,
+    options: Object.freeze(options),
+  });
+}
+
 export function parseProfileAccount(value: unknown): ProfileAccount {
   const object = closedObject(value, ["schemaVersion", "accountState", "hasCurrentDraft"]);
   if (object.schemaVersion !== "PROFILE_ACCOUNT_V019" || object.accountState !== "ACTIVE" || typeof object.hasCurrentDraft !== "boolean") invalid();
@@ -685,13 +781,41 @@ export function parseProfileIdRequest(value: unknown): Readonly<{ profileVersion
   return Object.freeze({ profileVersionId: uuid(object.profileVersionId) });
 }
 
-export function parseTaxonomyRequest(value: unknown): Readonly<{ profileVersionId: string | null }> {
-  const object = closedObject(value, ["profileVersionId"], []);
-  return Object.freeze({
-    profileVersionId: !("profileVersionId" in object) || object.profileVersionId === null
-      ? null
-      : uuid(object.profileVersionId),
-  });
+export function parseTaxonomyRequest(value: unknown): ProfileTaxonomyRequest {
+  const candidate = objectValue(value);
+  if (!("operation" in candidate)) {
+    const object = closedObject(value, ["profileVersionId"], []);
+    return Object.freeze({
+      operation: "projection",
+      profileVersionId: !("profileVersionId" in object) || object.profileVersionId === null
+        ? null
+        : uuid(object.profileVersionId),
+    });
+  }
+  if (candidate.operation === "projection") {
+    const object = closedObject(
+      value,
+      ["operation", "profileVersionId"],
+      ["operation"],
+    );
+    return Object.freeze({
+      operation: "projection",
+      profileVersionId: !("profileVersionId" in object) || object.profileVersionId === null
+        ? null
+        : uuid(object.profileVersionId),
+    });
+  }
+  if (candidate.operation === "options") {
+    const object = closedObject(value, ["operation", "conceptKind"]);
+    return Object.freeze({
+      operation: "options",
+      conceptKind: enumValue(
+        object.conceptKind,
+        PROFILE_TAXONOMY_OPTION_KINDS,
+      ) as ProfileTaxonomyOptionKind,
+    });
+  }
+  invalid();
 }
 
 export function parseRevisionRequest(value: unknown): Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }> {
