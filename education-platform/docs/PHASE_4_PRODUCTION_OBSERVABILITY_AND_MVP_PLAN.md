@@ -9,7 +9,7 @@ Frozen baseline: commit `55296e1aeca9a25b066e9010c376f0e618af59d1`,
 tag `phase3-fit-v0.1`
 
 Related data-contract plan:
-[`MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md)
+[`MIGRATION_025_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_025_APPLICATION_OUTCOME_CONTRACT_PLAN.md)
 
 ## 1. Objective
 
@@ -21,9 +21,11 @@ usable product loop. It has two immediate workstreams:
 2. a thin authenticated user experience from student data intake through
    Eligibility, six-dimensional Fit, Financial review, and privacy deletion.
 
-Application tracking and verified outcome collection join the product loop
-only after the separately reviewed provisional Migration 024 contract is
-implemented under separate authorization.
+Application tracking and verified outcome collection remain a later lifecycle
+capability under the separately reviewed provisional Migration 025 contract.
+They are strategically useful for future outcome evidence, but they are not a
+prerequisite for completing the first Profile → Eligibility → Fit decision
+loop and require separate implementation authorization.
 
 Phase 4 does not change the frozen meanings of Eligibility or Fit. It does not
 implement Competitiveness, admission probability, ranking, recommendation, or
@@ -50,6 +52,24 @@ abort signal into the actual database network request; the wrapper does not
 race the whole handler and return while an uncancelled finalizer continues.
 Their exact disposition is recorded in
 [`PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md`](PHASE_4A1_EDGE_HTTP_BOUNDARY_RELEASE.md).
+
+### 1.2 Market-evidence roadmap alignment
+
+Phase 4A-1 remains closed and frozen. The forward product sequence is aligned
+to the Evidence-Based Graduate Education Decision Intelligence thesis and the
+capability matrix in
+[`MARKET_EVIDENCE_PRODUCT_CAPABILITY_MATRIX.md`](MARKET_EVIDENCE_PRODUCT_CAPABILITY_MATRIX.md).
+This alignment changes forward priority only; it does not reopen observability
+work, alter frozen Eligibility/Fit/Financial semantics, or authorize code,
+schema, UI, data collection, or deployment.
+
+Market evidence determines **what** decision capability deserves priority.
+Representative student and program evidence determines **how** the smallest
+semantic contract should represent it. Executable evidence then proves
+correctness. Foundation work is deferred unless it serves a high-priority
+market decision demonstrated by real data, unblocks the executable path,
+closes a correctness/security/privacy defect, or represents a repeated
+real-data gap.
 
 ## 2. Frozen semantic boundaries
 
@@ -93,7 +113,7 @@ Profile backend core, Migration 020 is the Frozen Profile to new DRAFT fork,
 Migration 021 is the hosted Auth subject compatibility repair, Migration 022
 is the owner-scoped Profile taxonomy projection, and Migration 023 is the
 bounded ASSESSMENT/SKILL taxonomy options capability. The Application/Outcome
-plan now has a provisional future Migration 024 identity;
+plan now has a provisional future Migration 025 identity;
 that number remains provisional until implementation authorization. Any
 durable database operation receipt or trace table requires a separate additive
 migration after the implemented Application/Outcome migration.
@@ -258,9 +278,24 @@ Authenticated student
 → independent reviewer verifies or rejects
 → student resumes the same evaluation
 → inspect six categorical Fit dimensions and evidence limitations
-→ optionally create an application record after provisional Migration 024
 → export or delete student data
 ```
+
+After this exact loop works with real Auth/PostgREST execution and
+representative real program data, separate bounded increments may add:
+
+```text
+evidence-backed Program Comparison
+→ student-controlled Shortlist
+→ Career Outcomes / ROI decision support
+→ deeper Financial and International Accessibility evidence
+```
+
+Comparison preserves Eligibility, Fit dimensions, cost, career,
+international, geographic, preference, evidence, reasons, and uncertainty as
+separate decision domains. Shortlist records the student's choices. Neither
+capability creates a global score, ranking, Reach/Target/Safety label,
+admission probability, or portfolio optimizer.
 
 ### 4.2 Required screens
 
@@ -273,7 +308,11 @@ Authenticated student
 7. Fit result with exactly six dimension cards.
 8. Financial normalization pending/reviewed/resumed state.
 9. Privacy/export controls.
-10. Application tracker and outcome reporting only after provisional Migration 024.
+10. Program Comparison and Shortlist only after the core loop and real-program
+    evidence audit pass under separate implementation authorization.
+
+Application tracking, outcome reporting, and offer comparison are later
+lifecycle screens after their separately governed contracts are approved.
 
 ### 4.3 Result presentation rules
 
@@ -309,7 +348,8 @@ New API surface is grouped by capability rather than one endpoint per table:
 - Eligibility v0.2 evaluation orchestration;
 - the existing Fit and Financial endpoints;
 - privacy export/deletion orchestration;
-- Application/Outcome commands after provisional Migration 024.
+- later Application/Outcome commands only after provisional Migration 025 is
+  separately implemented and authorized.
 
 ### 4.5 Reviewer flow
 
@@ -321,6 +361,29 @@ The reviewer experience is separate from the student experience. It must:
 - display only the minimum evidence needed for the decision;
 - record a typed decision and reason code, not unrestricted notes;
 - never reuse `fit_normalization_reviewer` for application-outcome review.
+
+### 4.6 Post-Migration-024 delivery order
+
+The forward delivery order is:
+
+1. close and baseline Migration 024 Assessment/Skill admissibility without
+   seeding real assessment definitions;
+2. complete the Profile executable flow;
+3. run a real Profile → Eligibility → Fit end-to-end path;
+4. audit 10–20 representative real United States graduate programs, then
+   expand to 50–100 only after the first gaps are classified;
+5. implement evidence-preserving Comparison;
+6. implement student-controlled Shortlist;
+7. add Career Outcomes and non-composite ROI/value decision support;
+8. deepen tuition/total-cost, funding, and scholarship evidence; and
+9. deepen STEM/OPT and International Accessibility evidence with explicit
+   source dates, applicability, freshness, and uncertainty.
+
+Tests UI remains blocked until at least one real assessment completes official
+evidence → reviewed definition → `VERIFIED` → executable validation. Skills UI
+remains deferred because a few labels such as Python, R, or SQL do not justify
+a general taxonomy or editor. Neither resumes merely because local taxonomy
+foundation work exists.
 
 ## 5. Security and privacy gates
 
@@ -365,9 +428,9 @@ The reviewer experience is separate from the student experience. It must:
 
 ### Gate D — Application/Outcome enablement
 
-- Migration 024 receives independent design approval and implementation
+- Migration 025 receives independent design approval and implementation
   authorization;
-- clean `001→024`, populated `023→024`, RLS, concurrency, privacy, and remote
+- clean `001→025`, populated `024→025`, RLS, concurrency, privacy, and remote
   smoke gates pass;
 - outcome evidence/reviewer policy and research-consent copy are approved;
 - no Competitiveness training or inference job exists.

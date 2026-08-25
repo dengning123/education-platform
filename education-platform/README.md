@@ -23,15 +23,17 @@ supabase db reset
 The golden record is a data migration, so `db reset` installs both the schema
 and its verified data. `supabase/config.toml` deliberately disables a separate
 seed file. The active local migration directory contains migrations
-`001`–`023`; migrations `001`–`018` remain frozen. Additive Migration `019`
+`001`–`024`; migrations `001`–`018` remain frozen. Additive Migration `019`
 provides the local-only Profile draft/readiness/freeze backend capability, and
 Migration `020` adds the local-only Frozen Profile to new DRAFT fork. Migration
 `021` repairs hosted Auth subject extraction without expanding Auth ACLs, and
 Migration `022` adds the local-only owner-scoped Profile taxonomy label
 projection. Migration `023` adds local-only bounded ASSESSMENT/SKILL taxonomy
-options. None of `019`–`023` has
+options, and Migration `024` adds the local-only Assessment/Skill taxonomy
+admissibility core without seeding real assessment definitions. None of
+`019`–`024` has
 been deployed. The separately planned
-Application/Outcome contract has a provisional future Migration `024` identity and remains
+Application/Outcome contract has a provisional future Migration `025` identity and remains
 unimplemented pending separate implementation authorization.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
@@ -316,10 +318,23 @@ HTTP boundary release record is
 The remaining production observability and minimum product-loop work is still
 planning-only in
 [docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md](docs/PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
+
+The forward product thesis is **Evidence-Based Graduate Education Decision
+Intelligence** for students with Chinese university backgrounds considering
+United States graduate programs. Market evidence sets capability priority,
+representative student/program evidence shapes the smallest semantic contract,
+and executable evidence proves correctness. The current NOW/NEXT/LATER and
+deferred capability decisions, evidence sources, and real-data audit plan are
+recorded in
+[docs/MARKET_EVIDENCE_PRODUCT_CAPABILITY_MATRIX.md](docs/MARKET_EVIDENCE_PRODUCT_CAPABILITY_MATRIX.md).
+That roadmap is planning-only: it does not authorize a migration, UI, model,
+data collection, or deployment, and it preserves Eligibility as rule logic and
+Fit as categorical preference/constraint semantics.
+
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_024_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 024 SQL, Application/Outcome runtime, or Competitiveness model is
-implemented or authorized by those documents. The 024 number remains
+[docs/MIGRATION_025_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_025_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 025 SQL, Application/Outcome runtime, or Competitiveness model is
+implemented or authorized by those documents. The 025 number remains
 provisional until implementation authorization.
 The original Migration 020 plan disposition is preserved as historical
 provenance in
