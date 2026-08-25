@@ -446,6 +446,13 @@ export type ProfileDocument = Readonly<{
 }>;
 
 export type ProfileAccount = Readonly<{ schemaVersion: "PROFILE_ACCOUNT_V019"; accountState: "ACTIVE"; hasCurrentDraft: boolean }>;
+export type ProfileFrozenDiscovery = Readonly<{
+  schemaVersion: "PROFILE_FROZEN_DISCOVERY_V025";
+  profileVersionId: string;
+  versionNumber: number;
+  status: "FROZEN";
+  frozenAt: string;
+}>;
 export type ProfileOperationResult = Readonly<Record<string, unknown> & { schemaVersion: "PROFILE_OPERATION_RESULT_V019" | "PROFILE_OPERATION_RESULT_V020"; operation: "CREATE_OR_RESUME" | "MUTATE" | "FREEZE" | "FORK_FROZEN"; profileVersionId: string; revision: number }>;
 export type ProfileTaxonomyConcept = Readonly<{
   conceptId: string;
@@ -712,6 +719,26 @@ export function parseProfileAccount(value: unknown): ProfileAccount {
   const object = closedObject(value, ["schemaVersion", "accountState", "hasCurrentDraft"]);
   if (object.schemaVersion !== "PROFILE_ACCOUNT_V019" || object.accountState !== "ACTIVE" || typeof object.hasCurrentDraft !== "boolean") invalid();
   return Object.freeze({ schemaVersion: "PROFILE_ACCOUNT_V019", accountState: "ACTIVE", hasCurrentDraft: object.hasCurrentDraft });
+}
+
+export function parseProfileFrozenDiscovery(value: unknown): ProfileFrozenDiscovery {
+  const object = closedResponseObject(
+    value,
+    ["schemaVersion", "profileVersionId", "versionNumber", "status", "frozenAt"],
+  );
+  const versionNumber = nonNegativeInteger(object.versionNumber);
+  if (
+    object.schemaVersion !== "PROFILE_FROZEN_DISCOVERY_V025"
+    || object.status !== "FROZEN"
+    || versionNumber < 1
+  ) invalid();
+  return Object.freeze({
+    schemaVersion: "PROFILE_FROZEN_DISCOVERY_V025",
+    profileVersionId: uuid(object.profileVersionId),
+    versionNumber,
+    status: "FROZEN",
+    frozenAt: timestampValue(object.frozenAt),
+  });
 }
 
 export function parseProfileOperationResult(value: unknown): ProfileOperationResult {

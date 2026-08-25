@@ -12,7 +12,7 @@
   },
   "gates": {
     "FAST": {
-      "description": "Fast, targeted feedback for the current bounded Profile assessment-contract increment.",
+      "description": "Fast, targeted feedback for the current bounded Profile lifecycle-closure increment.",
       "classification": "light",
       "prerequisites": [
         "Repository-local Node dependencies are installed from committed lockfiles when a referenced package test is run.",
@@ -38,7 +38,7 @@
       ]
     },
     "RELEVANT": {
-      "description": "Executable-path proof for the current bounded Migration 024 Profile assessment admissibility increment.",
+      "description": "Executable-path proof for the current bounded Migration 025 Profile lifecycle-closure increment.",
       "classification": "heavy",
       "prerequisites": [
         "Docker is running and PostgreSQL 17 plus the current Supabase images are available locally.",
@@ -51,28 +51,32 @@
           "why": "Require safe disk headroom and read-only Docker health evidence before database work."
         },
         {
-          "id": "db.pg17-clean-001-024-non-super",
-          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner path."
+          "id": "db.pg17-clean-001-025-non-super",
+          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner through Migration 025."
         },
         {
-          "id": "db.phase024-behavior-security-privacy",
-          "why": "Run the existing Migration 024 behavior, security, adversarial, and privacy SQL suite."
+          "id": "db.phase025-discovery-security-privacy",
+          "why": "Run Migration 025 owner discovery, ACL, adversarial, and privacy SQL proof."
         },
         {
-          "id": "db.phase024-populated-023-024",
-          "why": "Prove the existing populated forward-upgrade and historical-row contract."
+          "id": "db.phase025-populated-024-025",
+          "why": "Prove the populated 024 to 025 forward-upgrade leaves existing Profile state unchanged."
         },
         {
-          "id": "db.phase024-definition-concurrency",
-          "why": "Prove concurrent definition verification serializes and fails closed."
+          "id": "db.phase020-profile-fork-concurrency",
+          "why": "Preserve the existing fork single-active-draft and idempotency concurrency proof used by this lifecycle."
         },
         {
-          "id": "db.supabase-reset-001-024",
+          "id": "db.supabase-reset-001-025",
           "why": "Exercise the actual local Supabase migration runner against the complete migration tree."
         },
         {
           "id": "db.local-auth-postgrest-profile-matrix",
-          "why": "Exercise real local Auth-issued subjects, PostgREST ownership, anonymous, malformed, and unrelated-user boundaries."
+          "why": "Exercise real local Auth-issued subjects, latest-FROZEN discovery, known read/fork ownership, anonymous, expired, malformed, and unrelated-user boundaries."
+        },
+        {
+          "id": "web.real-local-profile-lifecycle",
+          "why": "Prove the complete Browser to Next to Auth to PostgREST to PostgreSQL lifecycle and zero-residue cleanup."
         },
         {
           "id": "web.profile-contracts-targeted",
@@ -99,15 +103,15 @@
           "why": "Block heavy proof when host disk or read-only Docker health signals are unsafe."
         },
         {
-          "id": "db.pg15-clean-001-024-non-super",
-          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path."
+          "id": "db.pg15-clean-001-025-non-super",
+          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 025."
         },
         {
-          "id": "db.pg17-clean-001-024-non-super",
-          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path."
+          "id": "db.pg17-clean-001-025-non-super",
+          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path through Migration 025."
         },
         {
-          "id": "db.ordered-sql-001-016",
+          "id": "db.ordered-sql-001-017",
           "why": "Preserve version-scoped ordered SQL suites at their authoritative migration boundaries."
         },
         {
@@ -115,12 +119,20 @@
           "why": "Prove the populated Migration 023 to 024 forward-upgrade contract."
         },
         {
-          "id": "db.supabase-reset-001-024",
+          "id": "db.phase025-populated-024-025",
+          "why": "Prove the populated Migration 024 to 025 forward-upgrade contract."
+        },
+        {
+          "id": "db.supabase-reset-001-025",
           "why": "Prove the actual local Supabase clean runner path."
         },
         {
           "id": "db.phase024-behavior-security-privacy",
           "why": "Run the complete Migration 024 behavior, ACL, adversarial, and privacy suite."
+        },
+        {
+          "id": "db.phase025-discovery-security-privacy",
+          "why": "Run the complete Migration 025 owner discovery, ACL, adversarial, and privacy suite."
         },
         {
           "id": "db.phase024-definition-concurrency",
@@ -135,8 +147,8 @@
           "why": "Run the real local hosted-equivalent Auth/PostgREST Profile security matrix."
         },
         {
-          "id": "db.local-auth-restart-phase024",
-          "why": "Re-run the current Profile E2E after an exact local Auth service restart."
+          "id": "db.local-auth-restart-phase025",
+          "why": "Re-run the current Profile lifecycle security E2E after an exact local Auth service restart."
         },
         {
           "id": "backend.eligibility-full",
@@ -167,6 +179,10 @@
           "why": "Run the complete browser, auth, Profile, accessibility, and mobile suite."
         },
         {
+          "id": "web.real-local-profile-lifecycle",
+          "why": "Run the complete real local Browser to Next to Auth to PostgREST to database lifecycle."
+        },
+        {
           "id": "web.lint-full",
           "why": "Preserve zero-warning Web lint proof."
         },
@@ -192,7 +208,7 @@
         },
         {
           "id": "repo.frozen-invariant-audit",
-          "why": "Fail on Migration 001-023, semantic package, Edge boundary, evaluator, fingerprint, or runtime drift."
+          "why": "Fail on Migration 001-024, semantic package, Edge boundary, evaluator, fingerprint, or runtime drift."
         },
         {
           "id": "repo.diff-check",

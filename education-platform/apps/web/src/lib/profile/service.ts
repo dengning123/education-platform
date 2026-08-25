@@ -5,12 +5,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   parseProfileAccount,
   parseProfileDocument,
+  parseProfileFrozenDiscovery,
   parseProfileOperationResult,
   parseProfileReadiness,
   parseProfileTaxonomyOptions,
   parseProfileTaxonomyProjection,
   type ProfileAccount,
   type ProfileDocument,
+  type ProfileFrozenDiscovery,
   type ProfileMutationCommand,
   type ProfileOperationResult,
   type ProfileReadiness,
@@ -26,6 +28,8 @@ export interface ProfileService {
   bootstrap(): Promise<ProfileAccount>;
   createOrResume(operationId: string): Promise<ProfileOperationResult>;
   currentDocument(): Promise<ProfileDocument>;
+  knownDocument(profileVersionId: string): Promise<ProfileDocument>;
+  latestFrozen(): Promise<ProfileFrozenDiscovery>;
   readiness(profileVersionId: string): Promise<ProfileReadiness>;
   taxonomy(profileVersionId: string | null): Promise<ProfileTaxonomyProjection>;
   taxonomyOptions(conceptKind: ProfileTaxonomyOptionKind): Promise<ProfileTaxonomyOptions>;
@@ -92,6 +96,14 @@ class SupabaseProfileService implements ProfileService {
 
   async currentDocument(): Promise<ProfileDocument> {
     return parseProfileDocument(await this.rpc("get_profile_document_v019", { p_profile_version_id: null }));
+  }
+
+  async knownDocument(profileVersionId: string): Promise<ProfileDocument> {
+    return parseProfileDocument(await this.rpc("get_profile_document_v019", { p_profile_version_id: profileVersionId }));
+  }
+
+  async latestFrozen(): Promise<ProfileFrozenDiscovery> {
+    return parseProfileFrozenDiscovery(await this.rpc("get_latest_frozen_profile_v025"));
   }
 
   async readiness(profileVersionId: string): Promise<ProfileReadiness> {

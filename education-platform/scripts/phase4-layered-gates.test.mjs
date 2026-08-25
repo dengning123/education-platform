@@ -100,8 +100,8 @@ test("explain output includes reasons, prerequisites, order, and heavy classific
   assert.match(output, /^CLASSIFICATION=heavy/m);
   assert.match(output, /PREREQUISITES:/);
   assert.match(output, /EXECUTION_ORDER:/);
-  assert.match(output, /why: Prove the full PostgreSQL 15 non-superuser clean migration runner path\./);
-  assert.match(output, /db\.pg15-clean-001-024-non-super \[heavy\]/);
+  assert.match(output, /why: Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 025\./);
+  assert.match(output, /db\.pg15-clean-001-025-non-super \[heavy\]/);
   assert.match(output, /EXECUTION=NONE/);
 });
 

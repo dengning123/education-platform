@@ -60,6 +60,54 @@ function newDraft(versionNumber) {
   };
 }
 
+function remapId(value, mapping) {
+  if (value === null || value === undefined) return value;
+  return mapping.get(value) ?? value;
+}
+
+function forkDraft(source) {
+  const draft = newDraft(source.versionNumber + 1);
+  const evidenceIds = new Map(source.evidenceItems.map((record) => [record.evidenceId, nextId()]));
+  const degreeIds = new Map(source.degrees.map((record) => [record.degreeId, nextId()]));
+  const courseIds = new Map(source.courses.map((record) => [record.courseId, nextId()]));
+  const testIds = new Map(source.testScores.map((record) => [record.testScoreId, nextId()]));
+  const experienceIds = new Map(source.experiences.map((record) => [record.experienceId, nextId()]));
+  const skillIds = new Map(source.skills.map((record) => [record.skillId, nextId()]));
+  const goalIds = new Map(source.goals.map((record) => [record.goalId, nextId()]));
+  const preferenceIds = new Map(source.preferences.map((record) => [record.preferenceId, nextId()]));
+  const mappingIds = new Map(source.mappings.map((record) => [record.mappingId, nextId()]));
+
+  draft.evidenceItems = source.evidenceItems.map((record) => ({ ...structuredClone(record), evidenceId: evidenceIds.get(record.evidenceId) }));
+  draft.degrees = source.degrees.map((record) => ({ ...structuredClone(record), degreeId: degreeIds.get(record.degreeId), evidenceId: remapId(record.evidenceId, evidenceIds) }));
+  draft.courses = source.courses.map((record) => ({ ...structuredClone(record), courseId: courseIds.get(record.courseId), degreeId: remapId(record.degreeId, degreeIds), evidenceId: remapId(record.evidenceId, evidenceIds) }));
+  draft.testScores = source.testScores.map((record) => ({ ...structuredClone(record), testScoreId: testIds.get(record.testScoreId), evidenceId: remapId(record.evidenceId, evidenceIds) }));
+  draft.experiences = source.experiences.map((record) => ({ ...structuredClone(record), experienceId: experienceIds.get(record.experienceId), evidenceId: remapId(record.evidenceId, evidenceIds) }));
+  draft.skills = source.skills.map((record) => ({ ...structuredClone(record), skillId: skillIds.get(record.skillId), evidenceId: remapId(record.evidenceId, evidenceIds) }));
+  draft.experienceSkills = source.experienceSkills.map((record) => ({ ...structuredClone(record), experienceId: remapId(record.experienceId, experienceIds), skillId: remapId(record.skillId, skillIds) }));
+  draft.goals = source.goals.map((record) => ({ ...structuredClone(record), goalId: goalIds.get(record.goalId) }));
+  draft.preferences = source.preferences.map((record) => ({ ...structuredClone(record), preferenceId: preferenceIds.get(record.preferenceId) }));
+  draft.mappings = source.mappings.map((record) => {
+    const recordIdMap = record.recordType === "DEGREE" ? degreeIds : record.recordType === "COURSE" ? courseIds : new Map();
+    return {
+      ...structuredClone(record),
+      mappingId: mappingIds.get(record.mappingId),
+      recordId: remapId(record.recordId, recordIdMap),
+      evidenceId: remapId(record.evidenceId, evidenceIds),
+      supersedesMappingId: remapId(record.supersedesMappingId, mappingIds),
+    };
+  });
+  draft.taxonomyProjection = source.taxonomyProjection === null ? null : structuredClone(source.taxonomyProjection);
+  for (const declaration of source.completeness.values()) {
+    const copied = {
+      ...structuredClone(declaration),
+      completenessId: nextId(),
+      educationContextId: remapId(declaration.educationContextId, degreeIds),
+    };
+    draft.completeness.set(completenessKey(copied.educationContextId, copied.domain), copied);
+  }
+  return draft;
+}
+
 function completenessKey(educationContextId, domain) {
   return `${educationContextId ?? "GLOBAL"}:${domain}`;
 }
@@ -454,6 +502,19 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (rpc === "get_latest_frozen_profile_v025") {
+      const source = [...state.frozen.values()].sort((left, right) => right.versionNumber - left.versionNumber)[0];
+      if (!source) return rpcError(response, 404, "PROFILE_NOT_FOUND", "P0002");
+      send(response, 200, {
+        schemaVersion: "PROFILE_FROZEN_DISCOVERY_V025",
+        profileVersionId: source.id,
+        versionNumber: source.versionNumber,
+        status: "FROZEN",
+        frozenAt: now,
+      });
+      return;
+    }
+
     if (rpc === "get_profile_readiness_v019") {
       const requested = body.p_profile_version_id;
       const profile = state.draft?.id === requested ? state.draft : state.frozen.get(requested);
@@ -548,7 +609,7 @@ const server = createServer(async (request, response) => {
       if (replay === "CONFLICT") return rpcError(response, 409, "PROFILE_OPERATION_CONFLICT", "23505");
       if (replay) return send(response, 200, replay);
       if (state.draft) return rpcError(response, 409, "PROFILE_ACTIVE_DRAFT_EXISTS", "55000");
-      state.draft = newDraft(source.versionNumber + 1);
+      state.draft = forkDraft(source);
       const result = { schemaVersion: "PROFILE_OPERATION_RESULT_V020", operation: "FORK_FROZEN", sourceProfileVersionId: source.id, profileVersionId: state.draft.id, versionNumber: state.draft.versionNumber, status: "DRAFT", revision: 0 };
       state.operations.set(operationId, { fingerprint, result });
       send(response, 200, result);

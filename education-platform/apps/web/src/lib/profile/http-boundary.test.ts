@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type {
   ProfileAccount,
   ProfileDocument,
+  ProfileFrozenDiscovery,
   ProfileMutationCommand,
   ProfileOperationResult,
   ProfileReadiness,
@@ -88,6 +89,24 @@ class MockProfileService implements ProfileService {
     this.fail();
     this.calls.push({ method: "currentDocument" });
     return { ...document, revision: this.revision };
+  }
+
+  async knownDocument(input: string): Promise<ProfileDocument> {
+    this.fail();
+    this.calls.push({ method: "knownDocument", input });
+    return { ...document, profileVersionId: input, status: "FROZEN", snapshotHash: "a".repeat(64), frozenAt: "2026-08-25T12:00:00Z" };
+  }
+
+  async latestFrozen(): Promise<ProfileFrozenDiscovery> {
+    this.fail();
+    this.calls.push({ method: "latestFrozen" });
+    return {
+      schemaVersion: "PROFILE_FROZEN_DISCOVERY_V025",
+      profileVersionId: profileId,
+      versionNumber: 1,
+      status: "FROZEN",
+      frozenAt: "2026-08-25T12:00:00Z",
+    };
   }
 
   async readiness(input: string): Promise<ProfileReadiness> {
@@ -249,6 +268,23 @@ describe("Profile HTTP boundary", () => {
     expect(service.calls).toContainEqual({ method: "fork", input: { sourceProfileVersionId: profileId, operationId } });
     const studentIdAttempt = await handler(request(JSON.stringify({ sourceProfileVersionId: profileId, operationId, studentId: profileId })), context("fork"));
     expect(studentIdAttempt.status).toBe(422);
+  });
+
+  it("passes only closed latest-frozen and known-document requests", async () => {
+    const service = new MockProfileService();
+    const handler = router(service);
+    const latest = await handler(request("{}"), context("latest-frozen"));
+    const known = await handler(request(JSON.stringify({ profileVersionId: profileId })), context("known-document"));
+    const latestOwnership = await handler(request(JSON.stringify({ studentId: profileId })), context("latest-frozen"));
+    const knownOwnership = await handler(request(JSON.stringify({ profileVersionId: profileId, studentId: profileId })), context("known-document"));
+    const knownEnumeration = await handler(request(JSON.stringify({ profileVersionIds: [profileId] })), context("known-document"));
+    expect(latest.status).toBe(200);
+    expect(known.status).toBe(200);
+    expect(service.calls).toContainEqual({ method: "latestFrozen" });
+    expect(service.calls).toContainEqual({ method: "knownDocument", input: profileId });
+    expect(latestOwnership.status).toBe(422);
+    expect(knownOwnership.status).toBe(422);
+    expect(knownEnumeration.status).toBe(422);
   });
 
   it("accepts only the closed projection and bounded-option taxonomy operations", async () => {

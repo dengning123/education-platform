@@ -24,11 +24,13 @@ import {
   PROFILE_DEGREE_STATUSES,
   PROFILE_EVIDENCE_TYPES,
   parseProfileDocument,
+  parseProfileFrozenDiscovery,
   parseProfileOperationResult,
   parseProfileTaxonomyProjection,
   type ProfileCommand,
   type ProfileCommandPayloads,
   type ProfileDocument,
+  type ProfileFrozenDiscovery,
   type ProfileMutationCommand,
   type ProfileOperationResult,
   type ProfileTaxonomyProjection,
@@ -83,8 +85,10 @@ type RevisionConflict = Readonly<{
 }>;
 
 type ExactRetry = Readonly<{
-  capability: "mutate" | "freeze";
-  body: MutationRequest | Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }>;
+  capability: "mutate" | "freeze" | "fork";
+  body: MutationRequest
+    | Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }>
+    | Readonly<{ sourceProfileVersionId: string; operationId: string }>;
   description: string;
 }>;
 
@@ -335,6 +339,33 @@ export function ProfileDraftCore() {
     }
   }, []);
 
+  const readKnownFrozenDocument = useCallback(async (
+    discovery: ProfileFrozenDiscovery,
+    successNotice: string,
+  ): Promise<ProfileDocument | null> => {
+    const result = await postProfileRequest<ProfileDocument>("known-document", {
+      profileVersionId: discovery.profileVersionId,
+    });
+    if (!result.ok) {
+      dispatch({ type: "FAIL", notice: result.message ?? "The frozen Profile could not be read.", requestId: result.requestId });
+      return null;
+    }
+    try {
+      const document = parseProfileDocument(result.data);
+      if (
+        document.status !== "FROZEN"
+        || document.profileVersionId !== discovery.profileVersionId
+        || document.versionNumber !== discovery.versionNumber
+        || document.frozenAt !== discovery.frozenAt
+      ) throw new TypeError("FROZEN_DISCOVERY_DOCUMENT_MISMATCH");
+      dispatch({ type: "DOCUMENT", document, notice: successNotice, requestId: result.requestId });
+      return document;
+    } catch {
+      dispatch({ type: "FAIL", notice: "The frozen Profile response did not match the discovery contract.", requestId: result.requestId });
+      return null;
+    }
+  }, []);
+
   const openWorkspace = useCallback(async () => {
     dispatch({ type: "BEGIN", notice: "Opening your Profile workspace…" });
     const bootstrap = await postProfileRequest<{ schemaVersion: "PROFILE_ACCOUNT_V019"; accountState: "ACTIVE"; hasCurrentDraft: boolean }>("bootstrap", {});
@@ -343,11 +374,25 @@ export function ProfileDraftCore() {
       return;
     }
     if (!bootstrap.data.hasCurrentDraft) {
-      dispatch({ type: "EMPTY", notice: "No active Profile draft exists yet.", requestId: bootstrap.requestId });
+      const latest = await postProfileRequest<ProfileFrozenDiscovery>("latest-frozen", {});
+      if (!latest.ok) {
+        if (latest.error === "RESOURCE_NOT_FOUND") {
+          dispatch({ type: "EMPTY", notice: "No active Profile draft or frozen version exists yet.", requestId: latest.requestId });
+        } else {
+          dispatch({ type: "FAIL", notice: latest.message ?? "Your frozen Profile could not be discovered.", requestId: latest.requestId });
+        }
+        return;
+      }
+      try {
+        const discovery = parseProfileFrozenDiscovery(latest.data);
+        await readKnownFrozenDocument(discovery, "Your latest immutable Profile version is loaded.");
+      } catch {
+        dispatch({ type: "FAIL", notice: "The frozen Profile discovery response did not match the public contract.", requestId: latest.requestId });
+      }
       return;
     }
     await readDocument("Your authoritative Profile draft is loaded.");
-  }, [readDocument]);
+  }, [readDocument, readKnownFrozenDocument]);
 
   useEffect(() => {
     void openWorkspace();
@@ -461,7 +506,11 @@ export function ProfileDraftCore() {
         await performMutation(retry.body as MutationRequest, retry.description);
         return;
       }
-      await performFreeze(retry.body as Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }>);
+      if (retry.capability === "freeze") {
+        await performFreeze(retry.body as Readonly<{ profileVersionId: string; operationId: string; expectedRevision: number }>);
+        return;
+      }
+      await performFork(retry.body as Readonly<{ sourceProfileVersionId: string; operationId: string }>);
     } finally {
       mutationLock.current = false;
     }
@@ -512,6 +561,53 @@ export function ProfileDraftCore() {
     }
   }
 
+  async function performFork(body: Readonly<{ sourceProfileVersionId: string; operationId: string }>) {
+    dispatch({ type: "BEGIN", notice: "Creating a new draft from this immutable Profile…" });
+    const result = await postProfileRequest<ProfileOperationResult>("fork", body, { ambiguousRetries: 1 });
+    if (!result.ok) {
+      if (result.error === "PROFILE_ACTIVE_DRAFT_EXISTS") {
+        await readDocument("An existing active Profile draft is loaded instead.");
+      } else {
+        dispatch({
+          type: "FAIL",
+          notice: result.message ?? "A new Profile draft was not created.",
+          requestId: result.requestId,
+          exactRetry: result.error === "REQUEST_TIMEOUT"
+            ? { capability: "fork", body, description: "Create new draft from frozen Profile" }
+            : null,
+        });
+      }
+      return false;
+    }
+    try {
+      const operation = parseProfileOperationResult(result.data);
+      if (
+        operation.operation !== "FORK_FROZEN"
+        || operation.sourceProfileVersionId !== body.sourceProfileVersionId
+        || operation.status !== "DRAFT"
+      ) throw new TypeError("INVALID_FORK_RESULT");
+      clearAllProfileRecovery(window.sessionStorage);
+      return (await readDocument("New Profile draft created from the immutable version.")) !== null;
+    } catch {
+      dispatch({ type: "FAIL", notice: "The fork result did not match the expected public contract.", requestId: result.requestId });
+      return false;
+    }
+  }
+
+  async function forkProfile() {
+    if (mutationLock.current || !state.document || state.document.status !== "FROZEN") return;
+    mutationLock.current = true;
+    const body = Object.freeze({
+      sourceProfileVersionId: state.document.profileVersionId,
+      operationId: newProfileOperationId(),
+    });
+    try {
+      await performFork(body);
+    } finally {
+      mutationLock.current = false;
+    }
+  }
+
   async function changeSection(section: ProfileDraftSection) {
     if (section === state.section) return;
     if (!await profileSafety.requestDiscard({ message: PROFILE_SEMANTIC_COPY.unsaved.section })) return;
@@ -549,7 +645,13 @@ export function ProfileDraftCore() {
   if (!state.document) return null;
 
   if (state.phase === "frozen" || state.document.status === "FROZEN") {
-    return <FrozenProfileView document={state.document} state={state} />;
+    return <FrozenProfileView
+      document={state.document}
+      state={state}
+      taxonomy={taxonomy}
+      onFork={() => void forkProfile()}
+      onRetry={() => void retryExactRequest()}
+    />;
   }
 
   return (
@@ -1157,7 +1259,13 @@ function ReviewList({ title, items }: Readonly<{ title: string; items: readonly 
   return <article className="profile-section-card"><h3>{title}</h3><ul className="profile-review-list">{items.map((item) => <li key={item}>{item}</li>)}</ul></article>;
 }
 
-function FrozenProfileView({ document, state }: Readonly<{ document: ProfileDocument; state: UiState }>) {
+function FrozenProfileView({ document, state, taxonomy, onFork, onRetry }: Readonly<{
+  document: ProfileDocument;
+  state: UiState;
+  taxonomy: ProfileTaxonomyProjection | null;
+  onFork(): void;
+  onRetry(): void;
+}>) {
   const overview = profileOverview(document);
   return (
     <div className="profile-frozen-view" data-testid="profile-frozen-view">
@@ -1167,7 +1275,9 @@ function FrozenProfileView({ document, state }: Readonly<{ document: ProfileDocu
       <div className="profile-two-column"><ReviewList title="Source provenance" items={evidenceItems(document).map((source) => `${source.evidenceType.replaceAll("_", " ")} — ${source.locator ?? "No reference entered"}`)} /><ReviewList title="Education" items={degrees(document).map((degree) => `${degree.institutionName} — ${degree.degreeName}`)} /></div>
       <article className="profile-section-card"><h3>Courses</h3>{courses(document).length === 0 ? <p>No Course records were stored.</p> : <ul className="profile-review-list">{courses(document).map((course) => <li key={course.courseId}>{course.courseTitle} · {course.gradeText ?? (course.gradeValue === null ? "No grade entered" : `${course.gradeValue} / ${course.gradeScale}`)}</li>)}</ul>}</article>
       <article className="profile-section-card"><h3>Completeness declarations</h3><div className="profile-review-scopes">{overview.completenessScopes.map((scope) => <div key={scope.key}><span>{PROFILE_DOMAIN_LABELS[scope.domain]}<small>{scope.explanation ?? completenessDescription(scope.completeness)}</small></span><StatusPill value={scope.completeness} /></div>)}</div></article>
-      <InlineNote>Historical frozen-version discovery is not available in this MVP. This immediate view is available from the freeze response, but a refresh or later sign-in cannot currently rediscover it.</InlineNote>
+      <article className="profile-section-card" data-testid="profile-frozen-mapping-readiness"><h3>Mapping readiness</h3>{document.readiness.mappingReadiness.length === 0 ? <p>No Degree or Course mapping state is present.</p> : <div className="profile-review-scopes">{document.readiness.mappingReadiness.map((mapping) => <div key={`${mapping.recordType}-${mapping.recordId}`}><span>{mapping.recordType === "DEGREE" ? degreeLabel(document, mapping.recordId) : courses(document).find((course) => course.courseId === mapping.recordId)?.courseTitle ?? "Course record"}<small><MappingLabelSummary document={document} taxonomy={taxonomy} recordId={mapping.recordId} /></small></span><StatusPill value={mapping.verified ? "VERIFIED" : mapping.mappingStatuses[0] ?? "UNKNOWN"} /></div>)}</div>}</article>
+      {state.exactRetry ? <div className="profile-action-banner"><p>The fork outcome is ambiguous. Retry the exact same request to recover its authoritative result.</p><button className="secondary-button" type="button" disabled={state.pending} onClick={onRetry}>{state.pending ? "Working…" : "Retry exact request"}</button></div> : null}
+      <article className="profile-freeze-card"><h3>Continue with a new editable version</h3><p>This immutable Profile remains unchanged. The server will copy it into one new draft with new record identifiers.</p><button className="primary-button" type="button" disabled={state.pending || state.exactRetry !== null} onClick={onFork}>{state.pending ? "Creating draft…" : "Create new draft from this version"}</button></article>
       <p className="profile-disclosure">{PROFILE_SEMANTIC_COPY.frozen.disclosure}</p>
     </div>
   );

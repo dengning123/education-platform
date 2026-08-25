@@ -27,7 +27,7 @@ async function reset(request: APIRequestContext) {
 
 test.beforeEach(async ({ request }) => reset(request));
 
-test("student completes the narrow source, education, course, declaration, and immediate freeze flow", async ({ page }) => {
+test("student freezes, rediscovers after login, forks, and continues the authoritative draft", async ({ page }) => {
   const browserRequests: { url: string; body: string | null }[] = [];
   page.on("request", (request) => browserRequests.push({ url: request.url(), body: request.postData() }));
   await openDraft(page);
@@ -98,7 +98,17 @@ test("student completes the narrow source, education, course, declaration, and i
   await expect(page.getByTestId("profile-frozen-view")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Frozen v1" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Edit|Add|Save/ })).toHaveCount(0);
-  await expect(page.getByText(/Historical frozen-version discovery is not available/)).toBeVisible();
+  await expect(page.getByText("本科成绩单原件")).toBeVisible();
+  const frozenBefore = await page.evaluate(async () => {
+    const discovery = await fetch("/api/profile/latest-frozen", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    }).then((response) => response.json());
+    const document = await fetch("/api/profile/known-document", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileVersionId: discovery.data.profileVersionId }),
+    }).then((response) => response.json());
+    return { discovery: discovery.data, document: document.data };
+  });
   expect(await page.evaluate(([storeKey, contextKey]) => ({
     store: window.sessionStorage.getItem(storeKey),
     context: window.sessionStorage.getItem(contextKey),
@@ -109,9 +119,40 @@ test("student completes the narrow source, education, course, declaration, and i
     return event.defaultPrevented;
   })).toBe(false);
 
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await signIn(page);
+  await page.goto("/profile");
+  await expect(page.getByTestId("profile-frozen-view")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Frozen v1" })).toBeVisible();
+  await expect(page.getByText("本科成绩单原件")).toBeVisible();
+  await expect(page.getByText("浙江大学 — 工学学士", { exact: true })).toBeVisible();
+  await expect(page.getByText("概率论与数理统计 · 优秀", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create new draft from this version" }).click();
+  await expect(page.getByTestId("profile-draft-core")).toBeVisible();
+  await expect(page.getByText("Draft v2")).toBeVisible();
+  await page.getByRole("button", { name: "Sources", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "TRANSCRIPT" })).toBeVisible();
+  await page.getByRole("button", { name: "Add source" }).click();
+  await page.getByLabel("Source type").selectOption("SELF_REPORT");
+  await page.getByLabel("Locator or reference").fill("Post-fork continuation source");
+  await page.getByRole("button", { name: "Save source" }).click();
+  await expect(page.getByText("Post-fork continuation source")).toBeVisible();
+
+  const frozenAfter = await page.evaluate(async (sourceProfileVersionId) => {
+    const document = await fetch("/api/profile/known-document", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileVersionId: sourceProfileVersionId }),
+    }).then((response) => response.json());
+    return document.data;
+  }, (frozenBefore as { discovery: { profileVersionId: string } }).discovery.profileVersionId);
+  expect(frozenAfter).toEqual((frozenBefore as { document: unknown }).document);
+
   const profileApiBodies = browserRequests.filter((entry) => /\/api\/profile\//.test(entry.url)).map((entry) => entry.body ?? "");
   expect(profileApiBodies.some((body) => body.includes('"command":"DEGREE_CREATE"'))).toBe(true);
   expect(profileApiBodies.some((body) => body.includes('"command":"COURSE_CREATE"'))).toBe(true);
+  expect(profileApiBodies.some((body) => body.includes('"sourceProfileVersionId"'))).toBe(true);
   expect(profileApiBodies.join("\n")).not.toContain("studentId");
   expect(browserRequests.some((entry) => /\/(?:rest|functions)\/v1\//.test(entry.url))).toBe(false);
 });

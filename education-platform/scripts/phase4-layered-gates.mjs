@@ -271,9 +271,26 @@ function spawnResult(bin, args, options, capture) {
     let stderr = "";
     let child;
     try {
+      const environment = options.env ?? process.env;
+      const executablePath = environment.PATH ?? "";
+      const executableDirectories = [
+        process.execPath,
+        environment.PHASE4_DOCKER_BIN,
+        environment.DOCKER_BIN,
+        environment.PHASE4_SUPABASE_BIN,
+        environment.SUPABASE_BIN,
+        environment.PHASE4_PNPM_BIN,
+        environment.PHASE4_NPM_BIN,
+        environment.PHASE4_GIT_BIN,
+      ].filter((value) => typeof value === "string" && value.startsWith("/")).map(dirname);
+      const pathDirectories = executablePath.split(":").filter(Boolean);
+      const childPath = [...new Set([...executableDirectories, ...pathDirectories])].join(":");
       child = spawn(bin, args, {
         cwd: options.cwd,
-        env: options.env,
+        env: {
+          ...environment,
+          PATH: childPath,
+        },
         shell: false,
         stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
       });
@@ -410,6 +427,7 @@ function localAuthEnvironment(environment) {
     PHASE022_DB_CONTAINER: LOCAL_AUTH_DB_CONTAINER,
     PHASE023_DB_CONTAINER: LOCAL_AUTH_DB_CONTAINER,
     PHASE024_DB_CONTAINER: LOCAL_AUTH_DB_CONTAINER,
+    PHASE025_DB_CONTAINER: LOCAL_AUTH_DB_CONTAINER,
   };
 }
 
@@ -581,9 +599,12 @@ export async function executeCatalogCommand(id, spec, context = {}) {
     });
   }
   if (spec.kind === "spawn") {
+    const spawnEnvironment = id === "web.real-local-profile-lifecycle"
+      ? localAuthEnvironment(environment)
+      : environment;
     return spawnInherit(resolveTool(spec.tool, environment), spec.args, {
       cwd: safeRepositoryPath(spec.cwd),
-      env: environment,
+      env: spawnEnvironment,
     });
   }
   if (spec.kind === "docker-postgres") return runDockerPostgres(id, spec, environment);

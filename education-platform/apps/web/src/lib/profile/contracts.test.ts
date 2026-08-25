@@ -10,6 +10,7 @@ import {
   parseMutationRequest,
   parseProfileAccount,
   parseProfileDocument,
+  parseProfileFrozenDiscovery,
   parseProfileMutationCommand,
   parseProfileOperationResult,
   parseProfileTaxonomyOptions,
@@ -127,6 +128,21 @@ describe("Profile response DTO contract", () => {
     expect(() => parseProfileDocument({ ...draftDocument, reviewedBy: id("31") })).toThrow("INVALID_REQUEST");
     expect(() => parseProfileDocument({ ...draftDocument, status: "FROZEN" })).toThrow("INVALID_REQUEST");
     expect(() => parseProfileAccount({ schemaVersion: "PROFILE_ACCOUNT_V019", accountState: "ACTIVE", hasCurrentDraft: false, studentId: id("32") })).toThrow("INVALID_REQUEST");
+  });
+
+  it("accepts only the closed latest-frozen discovery DTO", () => {
+    const discovery = {
+      schemaVersion: "PROFILE_FROZEN_DISCOVERY_V025",
+      profileVersionId: id("30"),
+      versionNumber: 2,
+      status: "FROZEN",
+      frozenAt: "2026-08-25T12:00:00Z",
+    };
+    expect(parseProfileFrozenDiscovery(discovery)).toEqual(discovery);
+    expect(() => parseProfileFrozenDiscovery({ ...discovery, studentId: id("31") })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileFrozenDiscovery({ ...discovery, status: "DRAFT" })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileFrozenDiscovery({ ...discovery, versionNumber: 0 })).toThrow("INVALID_REQUEST");
+    expect(() => parseProfileFrozenDiscovery({ ...discovery, frozenAt: "not-a-timestamp" })).toThrow("INVALID_REQUEST");
   });
 
   it("rejects operation/schema drift, impossible status, and open resource keys", () => {

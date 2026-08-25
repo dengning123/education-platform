@@ -443,11 +443,11 @@ Ranking, probability, recommendation, and Competitiveness remain unimplemented.
 The forward product milestone remains the Phase 4 minimum authenticated loop;
 see
 [`PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md`](PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
-The separately bounded provisional Migration 025 Application/Outcome proposal is recorded
+The separately bounded provisional Migration 026 Application/Outcome proposal is recorded
 in
-[`MIGRATION_025_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_025_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+[`MIGRATION_026_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_026_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
 Its migration number remains provisional until implementation authorization.
-No Migration 025 SQL or Competitiveness implementation exists. Migration 021
+No Migration 026 SQL or Competitiveness implementation exists. Migration 021
 is limited to hosted Auth subject compatibility, Migration 022 is limited to
 the owner-scoped Profile taxonomy label projection, and Migration 023 is
 limited to bounded ASSESSMENT/SKILL taxonomy options. Migration 024's current

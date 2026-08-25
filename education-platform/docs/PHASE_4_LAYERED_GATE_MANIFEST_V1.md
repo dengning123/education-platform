@@ -87,18 +87,19 @@ lockfile. Failure does not cause fallback to a smaller test.
 
 ## RELEVANT
 
-Manifest v1 binds `RELEVANT` to the currently reviewed Migration 024 Profile
-assessment admissibility increment. It is intentionally conservative:
+Manifest v1 binds `RELEVANT` to the currently reviewed Migration 025 complete
+Profile lifecycle-closure increment. It is intentionally conservative:
 
 1. heavy read-only disk/Docker preflight;
-2. clean PostgreSQL 17 non-superuser `001→024` runner path;
-3. existing Phase 024 behavior/security/privacy SQL;
-4. existing populated `023→024` upgrade;
-5. existing Phase 024 definition concurrency probe;
+2. clean PostgreSQL 17 non-superuser `001→025` runner path;
+3. Phase 025 discovery/security/privacy SQL;
+4. populated `024→025` upgrade;
+5. existing Phase 020 fork concurrency probe;
 6. actual local `supabase db reset --local` path;
-7. existing Phase 021–024 Auth-issued JWT/PostgREST E2E sequence;
-8. targeted Profile command/DTO/source/semantic/no-AI tests;
-9. `git diff --check`.
+7. Phase 021–025 Auth-issued JWT/PostgREST E2E sequence;
+8. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
+9. targeted Profile command/DTO/source/semantic/no-AI tests;
+10. `git diff --check`.
 
 A future bounded increment needs a reviewed manifest version to change this
 mapping. The runner never infers relevance from changed paths and accepts no
@@ -109,31 +110,34 @@ caller-supplied test file or command.
 `BASELINE` preserves the current complete local final-proof categories:
 
 1. heavy read-only preflight;
-2. PostgreSQL 15 non-superuser clean `001→024`;
-3. PostgreSQL 17 non-superuser clean `001→024`;
-4. version-boundary ordered SQL suites `001–016`;
+2. PostgreSQL 15 non-superuser clean `001→025`;
+3. PostgreSQL 17 non-superuser clean `001→025`;
+4. version-boundary ordered SQL suites `001–017`;
 5. populated `023→024` upgrade;
-6. actual local Supabase reset;
-7. Phase 024 behavior/security/privacy;
-8. Phase 024 definition concurrency;
-9. Phase 020 Profile fork concurrency;
-10. Phase 021–024 real local Auth/PostgREST matrix;
-11. exact local Auth restart followed by Phase 024 E2E;
-12. Eligibility full suite;
-13. Fit Engine full suite;
-14. production adapter full suite;
-15. frozen Edge HTTP boundary suite;
-16. Minimum Beta Operations checker/query-pack tests;
-17. Web unit/contract/security suite;
-18. full browser/auth/Profile/accessibility/mobile suite;
-19. lint;
-20. TypeScript;
-21. Next.js production build;
-22. client-secret/test-fixture source boundary;
-23. semantic/no-AI executable guards;
-24. frozen Fit runtime rebuild/reproducibility;
-25. frozen Migration/semantic/Edge/evaluator/fingerprint/runtime audit;
-26. final `git diff --check`.
+6. populated `024→025` upgrade;
+7. actual local Supabase reset;
+8. Phase 024 behavior/security/privacy;
+9. Phase 025 discovery/security/privacy;
+10. Phase 024 definition concurrency;
+11. Phase 020 Profile fork concurrency;
+12. Phase 021–025 real local Auth/PostgREST matrix;
+13. exact local Auth restart followed by Phase 025 E2E;
+14. Eligibility full suite;
+15. Fit Engine full suite;
+16. production adapter full suite;
+17. frozen Edge HTTP boundary suite;
+18. Minimum Beta Operations checker/query-pack tests;
+19. Web unit/contract/security suite;
+20. full fake browser/auth/Profile/accessibility/mobile suite;
+21. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
+22. lint;
+23. TypeScript;
+24. Next.js production build;
+25. client-secret/test-fixture source boundary;
+26. semantic/no-AI executable guards;
+27. frozen Fit runtime rebuild/reproducibility;
+28. frozen Migration 001–024/semantic/Edge/evaluator/fingerprint/runtime audit;
+29. final `git diff --check`.
 
 The ordered SQL command applies and tests frozen versions at their documented
 boundaries; it does not incorrectly run old negative-leakage tests only after
@@ -228,7 +232,7 @@ startup. It is not a reduction in final test count or assurance.
 ## Limitations
 
 - Manifest v1's `RELEVANT` mapping is specific to the current Profile
-  assessment capability; it is not a general changed-path selector.
+  lifecycle-closure capability; it is not a general changed-path selector.
 - Package and Playwright dependencies must be installed before package/browser
   commands run. The runner does not change package versions or lockfiles.
 - Required PostgreSQL/Supabase/Docker images must already be available; the
