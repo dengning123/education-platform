@@ -1,0 +1,237 @@
+{
+  "schemaVersion": "PHASE4_LAYERED_GATE_MANIFEST_V1",
+  "policy": {
+    "failFast": true,
+    "shellExecution": false,
+    "baselineChangedPathSkipping": false,
+    "releaseChangedPathSkipping": false,
+    "diskThresholdBytes": {
+      "light": 1073741824,
+      "heavy": 8589934592
+    }
+  },
+  "gates": {
+    "FAST": {
+      "description": "Fast, targeted feedback for the current bounded Profile assessment-contract increment.",
+      "classification": "light",
+      "prerequisites": [
+        "Repository-local Node dependencies are installed from committed lockfiles when a referenced package test is run.",
+        "No database, Supabase, Docker, or remote service is required."
+      ],
+      "commands": [
+        {
+          "id": "preflight.light",
+          "why": "Fail closed before local work when host disk is below the light-gate safety floor."
+        },
+        {
+          "id": "tooling.layered-gate-tests",
+          "why": "Prove the closed manifest, runner, preflight, timing, and adversarial contracts."
+        },
+        {
+          "id": "web.profile-contracts-targeted",
+          "why": "Catch Profile DTO, command-parity, source-boundary, semantic-copy, and no-AI-authoritative-autofill defects quickly."
+        },
+        {
+          "id": "repo.diff-check",
+          "why": "Reject whitespace and patch-format defects without widening the test scope."
+        }
+      ]
+    },
+    "RELEVANT": {
+      "description": "Executable-path proof for the current bounded Migration 024 Profile assessment admissibility increment.",
+      "classification": "heavy",
+      "prerequisites": [
+        "Docker is running and PostgreSQL 17 plus the current Supabase images are available locally.",
+        "The local Supabase project is disposable and may be reset by the registered existing command.",
+        "Repository-local Node dependencies are installed from committed lockfiles."
+      ],
+      "commands": [
+        {
+          "id": "preflight.heavy",
+          "why": "Require safe disk headroom and read-only Docker health evidence before database work."
+        },
+        {
+          "id": "db.pg17-clean-001-024-non-super",
+          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner path."
+        },
+        {
+          "id": "db.phase024-behavior-security-privacy",
+          "why": "Run the existing Migration 024 behavior, security, adversarial, and privacy SQL suite."
+        },
+        {
+          "id": "db.phase024-populated-023-024",
+          "why": "Prove the existing populated forward-upgrade and historical-row contract."
+        },
+        {
+          "id": "db.phase024-definition-concurrency",
+          "why": "Prove concurrent definition verification serializes and fails closed."
+        },
+        {
+          "id": "db.supabase-reset-001-024",
+          "why": "Exercise the actual local Supabase migration runner against the complete migration tree."
+        },
+        {
+          "id": "db.local-auth-postgrest-profile-matrix",
+          "why": "Exercise real local Auth-issued subjects, PostgREST ownership, anonymous, malformed, and unrelated-user boundaries."
+        },
+        {
+          "id": "web.profile-contracts-targeted",
+          "why": "Prove the browser/server Profile command and closed DTO contract consumed by the SQL capability."
+        },
+        {
+          "id": "repo.diff-check",
+          "why": "Reject whitespace and patch-format defects before the increment is considered executable-path complete."
+        }
+      ]
+    },
+    "BASELINE": {
+      "description": "Complete local commit/push proof. Changed paths never remove a registered command.",
+      "classification": "heavy",
+      "prerequisites": [
+        "Docker is running with PostgreSQL 15, PostgreSQL 17, and current Supabase images available.",
+        "The local Supabase project and all gate-created PostgreSQL containers are disposable test resources.",
+        "Repository-local Node dependencies and the Playwright browser are installed from committed lockfiles.",
+        "No remote mutation or deployment is performed by BASELINE."
+      ],
+      "commands": [
+        {
+          "id": "preflight.heavy",
+          "why": "Block heavy proof when host disk or read-only Docker health signals are unsafe."
+        },
+        {
+          "id": "db.pg15-clean-001-024-non-super",
+          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path."
+        },
+        {
+          "id": "db.pg17-clean-001-024-non-super",
+          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path."
+        },
+        {
+          "id": "db.ordered-sql-001-016",
+          "why": "Preserve version-scoped ordered SQL suites at their authoritative migration boundaries."
+        },
+        {
+          "id": "db.phase024-populated-023-024",
+          "why": "Prove the populated Migration 023 to 024 forward-upgrade contract."
+        },
+        {
+          "id": "db.supabase-reset-001-024",
+          "why": "Prove the actual local Supabase clean runner path."
+        },
+        {
+          "id": "db.phase024-behavior-security-privacy",
+          "why": "Run the complete Migration 024 behavior, ACL, adversarial, and privacy suite."
+        },
+        {
+          "id": "db.phase024-definition-concurrency",
+          "why": "Preserve the Migration 024 definition concurrency proof."
+        },
+        {
+          "id": "db.phase020-profile-fork-concurrency",
+          "why": "Preserve the existing Profile fork single-active-draft concurrency regression."
+        },
+        {
+          "id": "db.local-auth-postgrest-profile-matrix",
+          "why": "Run the real local hosted-equivalent Auth/PostgREST Profile security matrix."
+        },
+        {
+          "id": "db.local-auth-restart-phase024",
+          "why": "Re-run the current Profile E2E after an exact local Auth service restart."
+        },
+        {
+          "id": "backend.eligibility-full",
+          "why": "Preserve Eligibility generation, parity, typecheck, and full regression proof."
+        },
+        {
+          "id": "backend.fit-full",
+          "why": "Preserve the frozen categorical Fit Engine regression suite."
+        },
+        {
+          "id": "backend.adapter-full",
+          "why": "Preserve production adapter typecheck and regression proof."
+        },
+        {
+          "id": "edge.http-boundary-full",
+          "why": "Preserve the frozen Edge HTTP boundary security suite."
+        },
+        {
+          "id": "ops.minimum-beta-tooling-full",
+          "why": "Preserve the aggregate-only operations checker and read-only SQL pack tests."
+        },
+        {
+          "id": "web.unit-contract-security-full",
+          "why": "Run the complete Web unit, contract, and security suite."
+        },
+        {
+          "id": "web.browser-auth-profile-full",
+          "why": "Run the complete browser, auth, Profile, accessibility, and mobile suite."
+        },
+        {
+          "id": "web.lint-full",
+          "why": "Preserve zero-warning Web lint proof."
+        },
+        {
+          "id": "web.typecheck-full",
+          "why": "Preserve full Web TypeScript proof."
+        },
+        {
+          "id": "web.production-build-full",
+          "why": "Preserve the production Next.js build proof."
+        },
+        {
+          "id": "web.source-secret-fixture-boundary",
+          "why": "Preserve executable client-secret and test-fixture exclusion assertions."
+        },
+        {
+          "id": "web.semantic-no-ai-guards",
+          "why": "Preserve authoritative semantic-copy and no-AI-autofill executable guards."
+        },
+        {
+          "id": "fit.runtime-reproducibility",
+          "why": "Rebuild and verify the frozen Fit runtime identity."
+        },
+        {
+          "id": "repo.frozen-invariant-audit",
+          "why": "Fail on Migration 001-023, semantic package, Edge boundary, evaluator, fingerprint, or runtime drift."
+        },
+        {
+          "id": "repo.diff-check",
+          "why": "Reject whitespace and patch-format defects as the final local baseline command."
+        }
+      ]
+    },
+    "RELEASE": {
+      "description": "Deployment/remote-release proof: the complete BASELINE followed by read-only remote preconditions and explicit mutation authorization holds.",
+      "classification": "heavy",
+      "extends": "BASELINE",
+      "prerequisites": [
+        "BASELINE prerequisites remain mandatory and are executed again as part of RELEASE.",
+        "Supabase CLI is authenticated and linked to the intended project for read-only preconditions.",
+        "SUPABASE_ACCESS_TOKEN and PHASE4_RELEASE_PROJECT_REF are supplied through the environment and are never printed.",
+        "Deployment and remote smoke require separate explicit authorization; v1 fails closed at those holds."
+      ],
+      "commands": [
+        {
+          "id": "release.remote-migration-history-readonly",
+          "why": "Read the linked remote migration history before any deployment decision."
+        },
+        {
+          "id": "release.minimum-beta-ops-readonly",
+          "why": "Run the existing aggregate-only deployment identity, operational-event, and read-only database checks."
+        },
+        {
+          "id": "release.deployment-authorization-hold",
+          "why": "Fail closed because deployment is outside this local-tooling authorization."
+        },
+        {
+          "id": "release.remote-smoke-authorization-hold",
+          "why": "Reserve the post-deployment hosted smoke position without creating remote traffic or data."
+        },
+        {
+          "id": "release.rollback-readiness-hold",
+          "why": "Reserve the reviewed rollback/readiness decision before a release can be declared complete."
+        }
+      ]
+    }
+  }
+}

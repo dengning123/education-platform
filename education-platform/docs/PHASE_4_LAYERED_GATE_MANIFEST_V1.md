@@ -1,0 +1,241 @@
+# Phase 4 Layered Gate Manifest v1
+
+Status: local tooling only; not a baseline commit, release, deployment, or CI
+workflow.
+
+## Purpose
+
+The layered gate runner reduces repeated proof during bounded implementation
+work without weakening final proof. It exposes exactly four closed gates:
+
+- `FAST`: quick targeted feedback;
+- `RELEVANT`: the real executable path for the currently reviewed bounded
+  increment;
+- `BASELINE`: the complete local proof required before commit/push;
+- `RELEASE`: the complete `BASELINE` followed by remote/deployment
+  preconditions.
+
+`FAST` and `RELEVANT` are intermediate feedback tools. They never authorize a
+commit, push, deployment, remote mutation, migration-history repair, or a claim
+that final regressions are unnecessary.
+
+## Files and command line
+
+- `scripts/phase4-layered-gates.manifest.json` is the closed manifest.
+- `scripts/phase4-layered-gates.catalog.mjs` is the audited command catalog and
+  immutable minimum-strength policy.
+- `scripts/phase4-layered-gates.mjs` validates, explains, preflights, times, and
+  executes catalog identities without a shell.
+- `scripts/phase4-layered-gates.test.mjs` is the pure-local security and
+  behavior suite.
+
+Run with a Node.js 20+ executable:
+
+```text
+node scripts/phase4-layered-gates.mjs validate
+node scripts/phase4-layered-gates.mjs dry-run FAST
+node scripts/phase4-layered-gates.mjs explain RELEVANT
+node scripts/phase4-layered-gates.mjs preflight BASELINE
+node scripts/phase4-layered-gates.mjs run FAST
+```
+
+Gate names are exact and case-sensitive. Unknown modes, gates, extra arguments,
+command identities, manifest keys, catalog references, or paths outside the
+repository fail closed. There is no free-form command argument and every child
+process uses `shell: false`.
+
+## Closed manifest schema
+
+The top-level object contains exactly:
+
+```text
+schemaVersion
+policy
+gates
+```
+
+The policy fixes:
+
+- fail-fast execution;
+- no shell execution;
+- no changed-path skipping for `BASELINE`;
+- no changed-path skipping for `RELEASE`;
+- 1 GiB minimum free disk for light work;
+- 8 GiB minimum free disk for heavy work.
+
+Each gate declares a bounded description, light/heavy classification,
+prerequisites, and an ordered list of `{ id, why }` references. `RELEASE` must
+also declare `extends: BASELINE`.
+
+The code contains an exact minimum command order for all four gates. A manifest
+cannot delete, reorder, replace, or configure away a `BASELINE` or `RELEASE`
+command. `RELEASE` resolves mechanically to all `BASELINE` commands followed by
+its release-only commands, so it is a strict superset.
+
+## FAST
+
+`FAST` is light and does not require Docker, PostgreSQL, Supabase, or a remote
+service. Its order is:
+
+1. light read-only disk preflight;
+2. layered tooling unit/security tests;
+3. targeted existing Profile command/DTO/source/semantic/no-AI tests;
+4. `git diff --check`.
+
+The Profile package test requires dependencies installed from the committed
+lockfile. Failure does not cause fallback to a smaller test.
+
+## RELEVANT
+
+Manifest v1 binds `RELEVANT` to the currently reviewed Migration 024 Profile
+assessment admissibility increment. It is intentionally conservative:
+
+1. heavy read-only disk/Docker preflight;
+2. clean PostgreSQL 17 non-superuser `001→024` runner path;
+3. existing Phase 024 behavior/security/privacy SQL;
+4. existing populated `023→024` upgrade;
+5. existing Phase 024 definition concurrency probe;
+6. actual local `supabase db reset --local` path;
+7. existing Phase 021–024 Auth-issued JWT/PostgREST E2E sequence;
+8. targeted Profile command/DTO/source/semantic/no-AI tests;
+9. `git diff --check`.
+
+A future bounded increment needs a reviewed manifest version to change this
+mapping. The runner never infers relevance from changed paths and accepts no
+caller-supplied test file or command.
+
+## BASELINE
+
+`BASELINE` preserves the current complete local final-proof categories:
+
+1. heavy read-only preflight;
+2. PostgreSQL 15 non-superuser clean `001→024`;
+3. PostgreSQL 17 non-superuser clean `001→024`;
+4. version-boundary ordered SQL suites `001–016`;
+5. populated `023→024` upgrade;
+6. actual local Supabase reset;
+7. Phase 024 behavior/security/privacy;
+8. Phase 024 definition concurrency;
+9. Phase 020 Profile fork concurrency;
+10. Phase 021–024 real local Auth/PostgREST matrix;
+11. exact local Auth restart followed by Phase 024 E2E;
+12. Eligibility full suite;
+13. Fit Engine full suite;
+14. production adapter full suite;
+15. frozen Edge HTTP boundary suite;
+16. Minimum Beta Operations checker/query-pack tests;
+17. Web unit/contract/security suite;
+18. full browser/auth/Profile/accessibility/mobile suite;
+19. lint;
+20. TypeScript;
+21. Next.js production build;
+22. client-secret/test-fixture source boundary;
+23. semantic/no-AI executable guards;
+24. frozen Fit runtime rebuild/reproducibility;
+25. frozen Migration/semantic/Edge/evaluator/fingerprint/runtime audit;
+26. final `git diff --check`.
+
+The ordered SQL command applies and tests frozen versions at their documented
+boundaries; it does not incorrectly run old negative-leakage tests only after
+all later objects exist. Database commands create exact disposable PostgreSQL
+containers with tmpfs data and invoke the existing SQL/scripts unchanged.
+
+No changed-path setting can shorten this list. A successful `FAST` or
+`RELEVANT` run is not accepted as evidence for a `BASELINE` result.
+
+## RELEASE
+
+`RELEASE` always re-runs the complete `BASELINE`, then adds:
+
+1. read-only linked remote migration-history inspection;
+2. the existing aggregate-only Minimum Beta Operations checker, including its
+   read-only database query pack;
+3. an explicit deployment authorization hold;
+4. an explicit hosted smoke authorization hold;
+5. an explicit rollback/readiness review hold.
+
+The final three identities are deliberate fail-closed positions. This local
+tooling authorization does not permit deployment, hosted smoke traffic, remote
+data creation, or a rollback decision. A later, separately authorized release
+increment must replace those holds with reviewed, closed commands. They cannot
+be bypassed with a CLI flag or changed-path claim.
+
+The remote checker receives `PHASE4_RELEASE_PROJECT_REF` and
+`SUPABASE_ACCESS_TOKEN` only through the process environment. The access token
+is not placed in display text, timing records, or child-process arguments.
+
+## Read-only preflight
+
+Preflight reads host filesystem availability using the operating system's
+filesystem statistics. Heavy preflight also uses only these Docker actions:
+
+```text
+version
+info
+ps
+inspect
+logs --tail 200
+```
+
+It never calls `run`, `exec`, `start`, `stop`, `restart`, `rm`, or `prune`.
+Docker logs are scanned in memory for read-only filesystem, I/O, ext4, WAL
+fsync, and potential-data-loss markers; raw logs are not emitted. If the exact
+local Supabase database container is running, its running/health state is also
+checked.
+
+This is a safe observable health signal, not a destructive write/fsync probe.
+An unavailable daemon, unreadable health state, unsafe marker, unhealthy local
+database, or free disk below the fixed threshold fails the heavy gate before
+tests start.
+
+The actual gate commands may create disposable local PostgreSQL containers,
+reset the disposable local Supabase database, or restart the exact local Auth
+container where the manifest explicitly says so. Those are test commands, not
+preflight behavior.
+
+## Dry-run, explain, timing, and failures
+
+`dry-run` and `explain` validate the same closed manifest and references but
+execute no preflight, test, Docker, Supabase, or remote command. Both display:
+
+- resolved command identity;
+- sanitized command template;
+- reason;
+- prerequisite;
+- deterministic order;
+- light/heavy classification.
+
+Every real command produces one bounded timing event with its identity,
+classification, duration, status, and original exit code. The gate produces a
+total-duration event. Tool-owned events never contain environment variables,
+JWTs, API keys, credentials, request/response bodies, or raw Docker logs.
+
+Execution is fail-fast. A required command's nonzero exit code is returned as
+the gate exit code; the runner neither converts it to success nor continues to
+later commands. Internal runner/configuration failures use closed failure
+codes.
+
+## Expected workflow benefit
+
+During implementation, `FAST` avoids Docker/Supabase/browser/full-package
+startup and `RELEVANT` avoids unrelated frozen back-end and complete Web proof.
+The expensive dual-version replay, full browser/build, reproducibility, and
+frozen audits still run once at the baseline boundary and again for release.
+
+The benefit is shorter intermediate feedback and less repeated database/browser
+startup. It is not a reduction in final test count or assurance.
+
+## Limitations
+
+- Manifest v1's `RELEVANT` mapping is specific to the current Profile
+  assessment capability; it is not a general changed-path selector.
+- Package and Playwright dependencies must be installed before package/browser
+  commands run. The runner does not change package versions or lockfiles.
+- Required PostgreSQL/Supabase/Docker images must already be available; the
+  runner does not prune or optimize Docker state.
+- Heavy preflight can observe health and known corruption markers but cannot
+  prove storage writes without mutation.
+- `RELEASE` intentionally cannot pass its remote-mutation holds under this
+  authorization.
+- CI, database templates/snapshots, cache reuse, deployment, and remote smoke
+  implementation remain outside v1.
