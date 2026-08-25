@@ -1,5 +1,5 @@
 -- Runs after Migration 023. Application/Outcome remains planning-only under
--- a provisional future Migration 024 identity.
+-- a provisional future Migration 025 identity.
 
 begin;
 
