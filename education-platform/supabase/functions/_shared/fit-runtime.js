@@ -1297,8 +1297,8 @@ function parseExactDecimal(value, label) {
   }
   const negative = value.startsWith("-");
   const unsigned = negative ? value.slice(1) : value;
-  const [integer = "0", fraction = ""] = unsigned.split(".");
-  const coefficient = BigInt(`${integer}${fraction}`) * (negative ? -1n : 1n);
+  const [integer2 = "0", fraction = ""] = unsigned.split(".");
+  const coefficient = BigInt(`${integer2}${fraction}`) * (negative ? -1n : 1n);
   return { coefficient, scale: fraction.length };
 }
 function powerOfTen(scale) {
@@ -1491,7 +1491,7 @@ function directComparable(selection, amount, basis, cost, intent) {
   }
   return comparable;
 }
-async function resolveFitEvaluationInput(database, contract, request, evaluationAsOf) {
+async function resolveFitEvaluationInputInternal(database, contract, request, evaluationAsOf, productAssembly) {
   const [profile, intentSet] = await Promise.all([
     database.select("student_profile_versions", { select: "profile_version_id,snapshot_hash,status", profile_version_id: `eq.${request.profileVersionId}` }).then((rows) => requireOne(rows, "profile version")),
     database.select("fit_intent_sets", { select: "intent_set_id,profile_version_id,snapshot_hash,status", intent_set_id: `eq.${request.intentSetId}` }).then((rows) => requireOne(rows, "intent set"))
@@ -1501,6 +1501,44 @@ async function resolveFitEvaluationInput(database, contract, request, evaluation
   }
   const intents = await database.select("fit_intent_declarations", { select: "*", intent_set_id: `eq.${request.intentSetId}`, order: "dimension,intent_declaration_id" });
   const manifest = [];
+  const completenessKeyByDimension = /* @__PURE__ */ new Map();
+  if (productAssembly !== null) {
+    if (productAssembly.profileVersionId !== request.profileVersionId || productAssembly.intentSetId !== request.intentSetId || productAssembly.programVersionId !== request.programVersionId || productAssembly.taxonomyReleaseCode !== request.taxonomyReleaseCode || productAssembly.intentSnapshotHash !== intentSet.snapshot_hash) {
+      throw new FitAdapterError("Product Fit assembly identity does not match the frozen evaluation request", 409);
+    }
+    const assemblyDeclarations = new Map(productAssembly.declarations.map((row) => [row.declarationId, row]));
+    if (assemblyDeclarations.size !== intents.length || intents.some((row) => {
+      const declared = assemblyDeclarations.get(row.intent_declaration_id);
+      return declared === void 0 || declared.dimension !== row.dimension || declared.semanticType !== row.semantic_type || row.student_assertion_id === null || row.interpretation_provenance !== "SELF_ASSERTED";
+    })) {
+      throw new FitAdapterError("Product Fit assembly declarations do not match the frozen intent snapshot", 409);
+    }
+    for (const dimension of FIT_DIMENSIONS) {
+      const state = requireOne(productAssembly.dimensions.filter((row) => row.dimension === dimension), `${dimension} product disposition`);
+      const declarationCount = intents.filter((row) => row.dimension === dimension).length;
+      if (state.disposition === "DECLARED" !== declarationCount > 0) {
+        throw new FitAdapterError(`${dimension} product disposition conflicts with frozen declarations`, 409);
+      }
+      const method = methodFor(contract, dimension);
+      const policy = policyFor(method, "STUDENT_COMPLETENESS");
+      const key = `completeness:${method.identity.id}:${state.completenessId}`;
+      completenessKeyByDimension.set(dimension, key);
+      manifest.push({
+        kind: "PHASE2_COMPLETENESS",
+        ref: ref(
+          method,
+          policy,
+          key,
+          state.completenessId,
+          dimension === "ACADEMIC" ? "STUDENT_RAW_ACADEMIC_HISTORY" : dimension === "INTERNATIONAL_ACCESSIBILITY" ? "STUDENT_RAW_ACCESS_CONTEXT" : "STUDENT_RAW_INTENT",
+          "LIMITING_CONTEXT"
+        ),
+        educationContextId: null,
+        domain: state.completenessDomain,
+        completeness: state.profileCompleteness
+      });
+    }
+  }
   const intentById = /* @__PURE__ */ new Map();
   for (const row of intents) {
     const method = methodFor(contract, row.dimension);
@@ -1758,7 +1796,13 @@ async function resolveFitEvaluationInput(database, contract, request, evaluation
     if (methodManifest.length === 0) throw new FitAdapterError(`${dimension} has no exact intent or provenance manifest`, 422);
     return method.inputPolicies.filter((policy) => policy.disposition === "ALLOWED").map((policy) => {
       const keys = methodManifest.filter((item) => item.ref.inputPolicyRegistryId === policy.identity.id).map((item) => item.ref.manifestItemKey);
-      const included = keys.length > 0;
+      const productDimension = productAssembly?.dimensions.find((row) => row.dimension === dimension);
+      const productIntentPolicy = productDimension !== void 0 && policy.inputDomain === "FIT_INTENTS";
+      const included = productIntentPolicy ? productDimension.disposition === "DECLARED" : keys.length > 0;
+      if (productIntentPolicy && (included && keys.length === 0 || !included && keys.length !== 0)) {
+        throw new FitAdapterError(`${dimension} FIT_INTENTS state conflicts with authoritative M027 disposition`, 409);
+      }
+      const completenessKey = completenessKeyByDimension.get(dimension) ?? null;
       return {
         methodRegistryId: method.identity.id,
         inputPolicyRegistryId: policy.identity.id,
@@ -1766,9 +1810,9 @@ async function resolveFitEvaluationInput(database, contract, request, evaluation
         policyKey: policy.policyKey,
         requirement: policy.requirement,
         availability: included ? "INCLUDED" : "NOT_SUPPLIED",
-        manifestItemKeys: keys,
+        manifestItemKeys: included ? keys : [],
         completenessManifestItemKey: null,
-        provenanceManifestItemKey: included ? null : methodManifest[0].ref.manifestItemKey
+        provenanceManifestItemKey: included ? null : completenessKey ?? methodManifest[0].ref.manifestItemKey
       };
     });
   });
@@ -1793,6 +1837,12 @@ async function resolveFitEvaluationInput(database, contract, request, evaluation
     manifest,
     inputStates
   };
+}
+function resolveFitEvaluationInput(database, contract, request, evaluationAsOf) {
+  return resolveFitEvaluationInputInternal(database, contract, request, evaluationAsOf, null);
+}
+function resolveProductFitEvaluationInput(database, contract, request, evaluationAsOf, productAssembly) {
+  return resolveFitEvaluationInputInternal(database, contract, request, evaluationAsOf, productAssembly);
 }
 
 // src/persistence.ts
@@ -2244,13 +2294,14 @@ async function resolveFitContract(database, options) {
 // src/execute.ts
 var PRODUCTION_EVALUATOR_NAME = "education-platform-fit-engine";
 var PRODUCTION_EVALUATOR_VERSION = "0.1.0";
-async function executeFitEvaluation(database, request, sourceDatabase = database) {
+var PRODUCT_EVALUATOR_VERSION = "0.1.0-product-v027";
+async function executeWithResolvedInput(database, request, sourceDatabase, evaluatorVersion, inputResolver) {
   if (request.evidence.approvedFinancialNormalizationIds.length !== 0) {
     throw new FitAdapterError("Reviewed Financial normalizations must resume their existing BUILDING evaluation", 400);
   }
   const contract = await resolveFitContract(sourceDatabase, {
     evaluatorName: PRODUCTION_EVALUATOR_NAME,
-    evaluatorVersion: PRODUCTION_EVALUATOR_VERSION
+    evaluatorVersion
   });
   const evaluationId = await database.rpc("start_fit_evaluation", {
     p_profile_version_id: request.profileVersionId,
@@ -2268,12 +2319,7 @@ async function executeFitEvaluation(database, request, sourceDatabase = database
       evaluation_id: `eq.${evaluationId}`
     }), "started Fit evaluation");
     if (evaluation.evaluation_state !== "BUILDING") throw new FitAdapterError("New Fit evaluation is not BUILDING", 409);
-    const input = canonicalizeFitEvaluationInput(await resolveFitEvaluationInput(
-      sourceDatabase,
-      contract,
-      request,
-      evaluation.evaluation_as_of
-    ));
+    const input = canonicalizeFitEvaluationInput(await inputResolver(contract, evaluation.evaluation_as_of));
     const output = evaluateFit(input);
     canonicalFitOutputJson(output);
     const fingerprints = await persistFitEvaluation(database, evaluationId, input, output);
@@ -2288,9 +2334,27 @@ async function executeFitEvaluation(database, request, sourceDatabase = database
     });
   }
 }
+function executeFitEvaluation(database, request, sourceDatabase = database) {
+  return executeWithResolvedInput(
+    database,
+    request,
+    sourceDatabase,
+    PRODUCTION_EVALUATOR_VERSION,
+    (contract, evaluationAsOf) => resolveFitEvaluationInput(sourceDatabase, contract, request, evaluationAsOf)
+  );
+}
+function executeProductFitEvaluation(database, request, productAssembly, sourceDatabase = database) {
+  return executeWithResolvedInput(
+    database,
+    request,
+    sourceDatabase,
+    PRODUCT_EVALUATOR_VERSION,
+    (contract, evaluationAsOf) => resolveProductFitEvaluationInput(sourceDatabase, contract, request, evaluationAsOf, productAssembly)
+  );
+}
 
 // src/snapshot.ts
-async function loadFitEvaluationSnapshot(database, request, evaluationId) {
+async function loadFitEvaluationSnapshotWith(database, request, snapshotFunction, evaluationId) {
   let resumeSnapshot = {};
   if (request.evidence.approvedFinancialNormalizationIds.length > 0) {
     if (evaluationId === void 0) throw new FitAdapterError("Approved normalization requires a resume evaluation", 400);
@@ -2311,7 +2375,7 @@ async function loadFitEvaluationSnapshot(database, request, evaluationId) {
     ...normalizationObservationIds,
     ...basisObservationIds
   ])];
-  const snapshot = await database.rpc("get_fit_evaluation_snapshot_v016", {
+  const snapshot = await database.rpc(snapshotFunction, {
     p_profile_version_id: request.profileVersionId,
     p_intent_set_id: request.intentSetId,
     p_program_version_id: request.programVersionId,
@@ -2334,6 +2398,15 @@ async function loadFitEvaluationSnapshot(database, request, evaluationId) {
     }
   }
   return new FitSnapshotGateway(merged);
+}
+function loadFitEvaluationSnapshot(database, request, evaluationId) {
+  return loadFitEvaluationSnapshotWith(database, request, "get_fit_evaluation_snapshot_v016", evaluationId);
+}
+function loadProductFitEvaluationSnapshot(database, request) {
+  if (request.evidence.approvedFinancialNormalizationIds.length !== 0) {
+    throw new FitAdapterError("Product Fit evaluation cannot start from a reviewed Financial normalization", 400);
+  }
+  return loadFitEvaluationSnapshotWith(database, request, "get_fit_product_evaluation_snapshot_v028");
 }
 
 // src/normalization-workflow.ts
@@ -2421,14 +2494,236 @@ async function resumeFitEvaluation(database, request) {
   return { evaluationId: request.evaluationId, ...fingerprints, output };
 }
 
-// src/request.ts
+// src/product-intent-assembly.ts
+var UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+var HASH_PATTERN = /^[a-f0-9]{64}$/;
+var RELEASE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+var MAX_DECLARATIONS = 64;
+var dimensionDomain = {
+  ACADEMIC: "GOALS",
+  CAREER: "GOALS",
+  FINANCIAL: "PREFERENCES",
+  GEOGRAPHIC_DELIVERY: "PREFERENCES",
+  PERSONAL_PREFERENCE: "PREFERENCES",
+  INTERNATIONAL_ACCESSIBILITY: "GOALS"
+};
+function invalid(label) {
+  throw new FitAdapterError(`Authoritative M027 Fit assembly is invalid: ${label}`, 500);
+}
 function object(value, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return invalid(label);
+  return value;
+}
+function exactKeys(value, keys, label) {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) invalid(label);
+}
+function boundedText(value, label, maximum = 256) {
+  if (typeof value !== "string" || value.length === 0 || new TextEncoder().encode(value).length > maximum) return invalid(label);
+  return value;
+}
+function uuid(value, label) {
+  const result = boundedText(value, label, 36).toLowerCase();
+  if (!UUID_PATTERN.test(result)) return invalid(label);
+  return result;
+}
+function hash(value, label) {
+  const result = boundedText(value, label, 64);
+  if (!HASH_PATTERN.test(result)) return invalid(label);
+  return result;
+}
+function integer(value, label, minimum = 0) {
+  if (!Number.isSafeInteger(value) || value < minimum) return invalid(label);
+  return value;
+}
+function enumeration(value, values, label) {
+  if (typeof value !== "string" || !values.includes(value)) return invalid(label);
+  return value;
+}
+function nullableText(value, label, maximum = 64) {
+  return value === null ? null : boundedText(value, label, maximum);
+}
+function finiteNumber(value, label) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return invalid(label);
+  return value;
+}
+function parseTypedValue(semanticType, dimension, value) {
+  const row = object(value, "declaration typedValue");
+  if (semanticType === "TAXONOMY_TARGET") {
+    if (!["ACADEMIC", "CAREER", "INTERNATIONAL_ACCESSIBILITY"].includes(dimension)) invalid("taxonomy declaration dimension");
+    exactKeys(row, ["conceptId", "relation"], "taxonomy typedValue");
+    enumeration(row.relation, ["DESIRED", "EXCLUDED"], "taxonomy relation");
+    return uuid(row.conceptId, "taxonomy conceptId");
+  }
+  if (semanticType === "DELIVERY_CONSTRAINT") {
+    if (dimension !== "GEOGRAPHIC_DELIVERY") invalid("delivery declaration dimension");
+    exactKeys(row, ["deliveryMode", "relation"], "delivery typedValue");
+    enumeration(row.deliveryMode, ["IN_PERSON", "ONLINE", "HYBRID"], "deliveryMode");
+    enumeration(row.relation, ["DESIRED", "EXCLUDED"], "delivery relation");
+    return null;
+  }
+  if (semanticType === "FINANCIAL_CONSTRAINT") {
+    if (dimension !== "FINANCIAL") invalid("financial declaration dimension");
+    exactKeys(row, ["amount", "constraintSemantics", "currency", "scope", "period", "basis", "components"], "financial typedValue");
+    finiteNumber(row.amount, "financial amount");
+    enumeration(row.constraintSemantics, ["HARD_TOTAL_COST_CEILING", "PREFERRED_TOTAL_COST", "HARD_TUITION_CEILING", "PREFERRED_TUITION"], "financial semantics");
+    if (!/^[A-Z]{3}$/.test(boundedText(row.currency, "financial currency", 3))) invalid("financial currency");
+    const scope = enumeration(row.scope, ["COMPONENT", "TOTAL_COST"], "financial scope");
+    enumeration(row.period, ["MONTH", "ACADEMIC_YEAR", "CALENDAR_YEAR", "PROGRAM_DURATION", "ACADEMIC_SEMESTER", "CREDIT"], "financial period");
+    if (row.basis !== "GROSS" || !Array.isArray(row.components) || row.components.length !== 1) invalid("financial basis/components");
+    const component = enumeration(row.components[0], ["TUITION", "TOTAL_COST"], "financial component");
+    if (scope === "TOTAL_COST" !== (component === "TOTAL_COST")) invalid("financial scope/component pairing");
+    return null;
+  }
+  if (semanticType === "DURATION_CONSTRAINT") {
+    if (dimension !== "PERSONAL_PREFERENCE") invalid("duration declaration dimension");
+    exactKeys(row, ["minimumMonths", "maximumMonths"], "duration typedValue");
+    const minimum = row.minimumMonths === null ? null : finiteNumber(row.minimumMonths, "minimumMonths");
+    const maximum = row.maximumMonths === null ? null : finiteNumber(row.maximumMonths, "maximumMonths");
+    if (minimum === null && maximum === null || minimum !== null && maximum !== null && maximum < minimum) invalid("duration bounds");
+    return null;
+  }
+  if (dimension !== "PERSONAL_PREFERENCE") invalid("program feature declaration dimension");
+  exactKeys(row, ["featureKey", "expected"], "program feature typedValue");
+  if (row.featureKey !== "CAPSTONE_AVAILABLE" || typeof row.expected !== "boolean") invalid("program feature typedValue");
+  return null;
+}
+function parseProductFitIntentAssembly(value) {
+  const assembly = object(value, "assembly");
+  exactKeys(assembly, ["schemaVersion", "profileVersionId", "intentSetId", "programVersionId", "intentSnapshotHash", "dimensions", "intentDocument"], "assembly keys");
+  if (assembly.schemaVersion !== "FIT_EVALUATION_ASSEMBLY_V027") invalid("assembly schemaVersion");
+  if (!Array.isArray(assembly.dimensions) || assembly.dimensions.length !== FIT_DIMENSIONS.length) invalid("assembly dimensions");
+  const dimensions = assembly.dimensions.map((value2, index) => {
+    const row = object(value2, `dimensions[${index}]`);
+    exactKeys(row, ["dimension", "disposition", "inputAvailability", "completenessDomain", "completenessId", "profileCompleteness"], `dimensions[${index}] keys`);
+    const dimension = enumeration(row.dimension, FIT_DIMENSIONS, `dimensions[${index}].dimension`);
+    const disposition = enumeration(row.disposition, ["DECLARED", "EXPLICIT_NOT_SUPPLIED"], `dimensions[${index}].disposition`);
+    const inputAvailability = enumeration(row.inputAvailability, ["INCLUDED", "NOT_SUPPLIED"], `dimensions[${index}].inputAvailability`);
+    const completenessDomain = enumeration(row.completenessDomain, ["GOALS", "PREFERENCES"], `dimensions[${index}].completenessDomain`);
+    if (disposition === "DECLARED" !== (inputAvailability === "INCLUDED") || completenessDomain !== dimensionDomain[dimension]) invalid(`dimensions[${index}] semantic mapping`);
+    return Object.freeze({
+      dimension,
+      disposition,
+      inputAvailability,
+      completenessDomain,
+      completenessId: uuid(row.completenessId, `dimensions[${index}].completenessId`),
+      profileCompleteness: enumeration(row.profileCompleteness, ["COMPLETE", "PARTIAL", "UNKNOWN"], `dimensions[${index}].profileCompleteness`)
+    });
+  });
+  if (new Set(dimensions.map((row) => row.dimension)).size !== FIT_DIMENSIONS.length) invalid("duplicate dimensions");
+  const document = object(assembly.intentDocument, "intentDocument");
+  exactKeys(document, ["schemaVersion", "intentSetId", "profileVersionId", "versionNumber", "status", "revision", "snapshotHash", "taxonomyRelease", "dimensions", "declarations", "accessContext"], "intentDocument keys");
+  if (document.schemaVersion !== "FIT_INTENT_DOCUMENT_V027" || document.status !== "FROZEN") invalid("intentDocument identity/status");
+  integer(document.versionNumber, "intentDocument.versionNumber", 1);
+  integer(document.revision, "intentDocument.revision");
+  const documentDimensions = document.dimensions;
+  if (!Array.isArray(documentDimensions) || documentDimensions.length !== FIT_DIMENSIONS.length) invalid("intentDocument dimensions");
+  const documentState = /* @__PURE__ */ new Map();
+  for (const [index, value2] of documentDimensions.entries()) {
+    const row = object(value2, `intentDocument.dimensions[${index}]`);
+    exactKeys(row, ["dimension", "state"], `intentDocument.dimensions[${index}] keys`);
+    const dimension = enumeration(row.dimension, FIT_DIMENSIONS, `intentDocument.dimensions[${index}].dimension`);
+    const state = enumeration(row.state, ["DECLARED", "EXPLICIT_NOT_SUPPLIED"], `intentDocument.dimensions[${index}].state`);
+    if (documentState.has(dimension)) invalid("duplicate intentDocument dimensions");
+    documentState.set(dimension, state);
+  }
+  if (!Array.isArray(document.declarations) || document.declarations.length > MAX_DECLARATIONS) invalid("intentDocument declarations");
+  const declarations = document.declarations.map((value2, index) => {
+    const row = object(value2, `intentDocument.declarations[${index}]`);
+    exactKeys(row, ["declarationId", "dimension", "semanticType", "importance", "importanceConfirmedByStudent", "provenance", "typedValue"], `intentDocument.declarations[${index}] keys`);
+    const dimension = enumeration(row.dimension, FIT_DIMENSIONS, `intentDocument.declarations[${index}].dimension`);
+    const semanticType = enumeration(row.semanticType, ["TAXONOMY_TARGET", "DELIVERY_CONSTRAINT", "FINANCIAL_CONSTRAINT", "DURATION_CONSTRAINT", "PROGRAM_FEATURE_CONSTRAINT"], `intentDocument.declarations[${index}].semanticType`);
+    const importance = enumeration(row.importance, ["REQUIRED", "STRONGLY_PREFERRED", "PREFERRED", "NEUTRAL", "UNSPECIFIED"], `intentDocument.declarations[${index}].importance`);
+    if (typeof row.importanceConfirmedByStudent !== "boolean" || importance === "REQUIRED" && !row.importanceConfirmedByStudent || row.provenance !== "SELF_ASSERTED") invalid(`intentDocument.declarations[${index}] authority`);
+    return Object.freeze({
+      declarationId: uuid(row.declarationId, `intentDocument.declarations[${index}].declarationId`),
+      dimension,
+      semanticType,
+      taxonomyConceptId: parseTypedValue(semanticType, dimension, row.typedValue)
+    });
+  });
+  if (new Set(declarations.map((row) => row.declarationId)).size !== declarations.length) invalid("duplicate declaration IDs");
+  for (const dimension of FIT_DIMENSIONS) {
+    const outer = dimensions.find((row) => row.dimension === dimension);
+    const declarationCount = declarations.filter((row) => row.dimension === dimension).length;
+    if (documentState.get(dimension) !== outer.disposition || outer.disposition === "DECLARED" && declarationCount === 0 || outer.disposition === "EXPLICIT_NOT_SUPPLIED" && declarationCount !== 0) {
+      invalid(`${dimension} disposition/declaration consistency`);
+    }
+  }
+  let accessContextId = null;
+  if (document.accessContext !== null) {
+    const context = object(document.accessContext, "intentDocument.accessContext");
+    exactKeys(context, ["accessContextId", "citizenshipCountryCode", "residenceCountryCode", "jurisdictionCode", "currentStatusCode", "authorizationPathCode", "targetPathCode", "provenance"], "intentDocument.accessContext keys");
+    accessContextId = uuid(context.accessContextId, "intentDocument.accessContext.accessContextId");
+    nullableText(context.citizenshipCountryCode, "citizenshipCountryCode");
+    nullableText(context.residenceCountryCode, "residenceCountryCode");
+    boundedText(context.jurisdictionCode, "jurisdictionCode", 64);
+    nullableText(context.currentStatusCode, "currentStatusCode");
+    nullableText(context.authorizationPathCode, "authorizationPathCode");
+    boundedText(context.targetPathCode, "targetPathCode", 64);
+    if (context.provenance !== "SELF_ASSERTED" || documentState.get("INTERNATIONAL_ACCESSIBILITY") !== "DECLARED") invalid("accessContext provenance/dimension");
+  }
+  const taxonomy = object(document.taxonomyRelease, "intentDocument.taxonomyRelease");
+  exactKeys(taxonomy, ["releaseCode", "releaseOrdinal"], "intentDocument.taxonomyRelease keys");
+  const taxonomyReleaseCode = boundedText(taxonomy.releaseCode, "taxonomy releaseCode", 64);
+  if (!RELEASE_PATTERN.test(taxonomyReleaseCode)) invalid("taxonomy releaseCode");
+  const profileVersionId = uuid(assembly.profileVersionId, "assembly.profileVersionId");
+  const intentSetId = uuid(assembly.intentSetId, "assembly.intentSetId");
+  const intentSnapshotHash = hash(assembly.intentSnapshotHash, "assembly.intentSnapshotHash");
+  if (profileVersionId !== uuid(document.profileVersionId, "intentDocument.profileVersionId") || intentSetId !== uuid(document.intentSetId, "intentDocument.intentSetId") || intentSnapshotHash !== hash(document.snapshotHash, "intentDocument.snapshotHash")) {
+    invalid("assembly/document identity binding");
+  }
+  return Object.freeze({
+    schemaVersion: "FIT_EVALUATION_ASSEMBLY_V027",
+    profileVersionId,
+    intentSetId,
+    programVersionId: uuid(assembly.programVersionId, "assembly.programVersionId"),
+    intentSnapshotHash,
+    taxonomyReleaseCode,
+    taxonomyReleaseOrdinal: integer(taxonomy.releaseOrdinal, "taxonomy releaseOrdinal", 1),
+    dimensions: Object.freeze(dimensions),
+    declarations: Object.freeze(declarations),
+    accessContextId
+  });
+}
+function taxonomyConceptIdsFromProductAssembly(assembly) {
+  return Object.freeze([...new Set(assembly.declarations.flatMap((row) => row.taxonomyConceptId === null ? [] : [row.taxonomyConceptId]))].sort());
+}
+function fitEvaluationRequestFromProductAssembly(request, assembly) {
+  if (request.profileVersionId !== assembly.profileVersionId || request.intentSetId !== assembly.intentSetId || request.programVersionId !== assembly.programVersionId) {
+    throw new FitAdapterError("Product Fit request does not match its authoritative M027 assembly", 409);
+  }
+  return {
+    profileVersionId: assembly.profileVersionId,
+    intentSetId: assembly.intentSetId,
+    programVersionId: assembly.programVersionId,
+    taxonomyReleaseCode: assembly.taxonomyReleaseCode,
+    supersedesEvaluationId: null,
+    eligibilityContextEvaluationId: request.eligibilityContextEvaluationId,
+    evidence: {
+      canonicalObservationIds: [],
+      catalogMappingIds: [],
+      studentCourseIds: [],
+      studentMappingIds: [],
+      taxonomyConceptIds: taxonomyConceptIdsFromProductAssembly(assembly),
+      contextClaimIds: [],
+      contextMappingIds: [],
+      accessContextId: assembly.accessContextId,
+      directFinancialComparisons: [],
+      approvedFinancialNormalizationIds: []
+    }
+  };
+}
+
+// src/request.ts
+function object2(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new FitAdapterError(`${label} must be an object`, 400);
   }
   return value;
 }
-function exactKeys(value, keys, label) {
+function exactKeys2(value, keys, label) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
@@ -2441,7 +2736,7 @@ function text(value, label) {
   }
   return value;
 }
-function nullableText(value, label) {
+function nullableText2(value, label) {
   return value === null ? null : text(value, label);
 }
 function textArray(value, label) {
@@ -2457,9 +2752,26 @@ function exactDecimal(value, label) {
   }
   return result;
 }
+function isProductFitEvaluationRequest(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && value.schemaVersion === "FIT_PRODUCT_EVALUATION_REQUEST_V027";
+}
+function parseProductFitEvaluationRequest(value) {
+  const request = object2(value, "request");
+  exactKeys2(request, ["schemaVersion", "profileVersionId", "intentSetId", "programVersionId", "eligibilityContextEvaluationId"], "request");
+  if (request.schemaVersion !== "FIT_PRODUCT_EVALUATION_REQUEST_V027") {
+    throw new FitAdapterError("Unsupported product Fit request schema", 400);
+  }
+  return {
+    schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027",
+    profileVersionId: text(request.profileVersionId, "profileVersionId"),
+    intentSetId: text(request.intentSetId, "intentSetId"),
+    programVersionId: text(request.programVersionId, "programVersionId"),
+    eligibilityContextEvaluationId: nullableText2(request.eligibilityContextEvaluationId, "eligibilityContextEvaluationId")
+  };
+}
 function parseFitEvaluationRequest(value) {
-  const request = object(value, "request");
-  exactKeys(request, [
+  const request = object2(value, "request");
+  exactKeys2(request, [
     "profileVersionId",
     "intentSetId",
     "programVersionId",
@@ -2468,8 +2780,8 @@ function parseFitEvaluationRequest(value) {
     "eligibilityContextEvaluationId",
     "evidence"
   ], "request");
-  const evidence = object(request.evidence, "request.evidence");
-  exactKeys(evidence, [
+  const evidence = object2(request.evidence, "request.evidence");
+  exactKeys2(evidence, [
     "canonicalObservationIds",
     "catalogMappingIds",
     "studentCourseIds",
@@ -2485,8 +2797,8 @@ function parseFitEvaluationRequest(value) {
     throw new FitAdapterError("directFinancialComparisons must be an array", 400);
   }
   const directFinancialComparisons = evidence.directFinancialComparisons.map((item, index) => {
-    const row = object(item, `directFinancialComparisons[${index}]`);
-    exactKeys(row, ["financialIntentId", "amountObservationId", "billingBasisObservationId"], `directFinancialComparisons[${index}]`);
+    const row = object2(item, `directFinancialComparisons[${index}]`);
+    exactKeys2(row, ["financialIntentId", "amountObservationId", "billingBasisObservationId"], `directFinancialComparisons[${index}]`);
     return {
       financialIntentId: text(row.financialIntentId, "financialIntentId"),
       amountObservationId: text(row.amountObservationId, "amountObservationId"),
@@ -2502,8 +2814,8 @@ function parseFitEvaluationRequest(value) {
     intentSetId: text(request.intentSetId, "intentSetId"),
     programVersionId: text(request.programVersionId, "programVersionId"),
     taxonomyReleaseCode: text(request.taxonomyReleaseCode, "taxonomyReleaseCode"),
-    supersedesEvaluationId: nullableText(request.supersedesEvaluationId, "supersedesEvaluationId"),
-    eligibilityContextEvaluationId: nullableText(request.eligibilityContextEvaluationId, "eligibilityContextEvaluationId"),
+    supersedesEvaluationId: nullableText2(request.supersedesEvaluationId, "supersedesEvaluationId"),
+    eligibilityContextEvaluationId: nullableText2(request.eligibilityContextEvaluationId, "eligibilityContextEvaluationId"),
     evidence: {
       canonicalObservationIds: textArray(evidence.canonicalObservationIds, "canonicalObservationIds"),
       catalogMappingIds: textArray(evidence.catalogMappingIds, "catalogMappingIds"),
@@ -2512,21 +2824,21 @@ function parseFitEvaluationRequest(value) {
       taxonomyConceptIds: textArray(evidence.taxonomyConceptIds, "taxonomyConceptIds"),
       contextClaimIds: textArray(evidence.contextClaimIds, "contextClaimIds"),
       contextMappingIds: textArray(evidence.contextMappingIds, "contextMappingIds"),
-      accessContextId: nullableText(evidence.accessContextId, "accessContextId"),
+      accessContextId: nullableText2(evidence.accessContextId, "accessContextId"),
       directFinancialComparisons,
       approvedFinancialNormalizationIds: textArray(evidence.approvedFinancialNormalizationIds, "approvedFinancialNormalizationIds")
     }
   };
 }
 function parseFitFinancialNormalizationDraftRequest(value) {
-  const request = object(value, "request");
-  exactKeys(request, ["evaluation", "draft"], "request");
+  const request = object2(value, "request");
+  exactKeys2(request, ["evaluation", "draft"], "request");
   const evaluation = parseFitEvaluationRequest(request.evaluation);
   if (evaluation.evidence.directFinancialComparisons.length !== 0 || evaluation.evidence.approvedFinancialNormalizationIds.length !== 0) {
     throw new FitAdapterError("Normalization preparation cannot include completed Financial comparisons", 400);
   }
-  const draft = object(request.draft, "request.draft");
-  exactKeys(draft, [
+  const draft = object2(request.draft, "request.draft");
+  exactKeys2(draft, [
     "financialIntentId",
     "amountObservationId",
     "billingBasisObservationId",
@@ -2544,7 +2856,7 @@ function parseFitFinancialNormalizationDraftRequest(value) {
   if (draft.rounding !== "NONE") {
     throw new FitAdapterError("The v017 normalization methods permit only exact no-rounding arithmetic", 400);
   }
-  const fundingIntentId = nullableText(draft.fundingIntentId, "fundingIntentId");
+  const fundingIntentId = nullableText2(draft.fundingIntentId, "fundingIntentId");
   if (draft.normalizationMethodCode === "ANNUAL_TO_NET_PROGRAM" !== (fundingIntentId !== null)) {
     throw new FitAdapterError("Net normalization requires exactly one funding intent; gross normalization forbids it", 400);
   }
@@ -2564,16 +2876,16 @@ function parseFitFinancialNormalizationDraftRequest(value) {
   };
 }
 function parseFitFinancialNormalizationReviewRequest(value) {
-  const request = object(value, "request");
-  exactKeys(request, ["normalizationId", "verificationEvidenceId"], "request");
+  const request = object2(value, "request");
+  exactKeys2(request, ["normalizationId", "verificationEvidenceId"], "request");
   return {
     normalizationId: text(request.normalizationId, "normalizationId"),
     verificationEvidenceId: text(request.verificationEvidenceId, "verificationEvidenceId")
   };
 }
 function parseFitEvaluationResumeRequest(value) {
-  const request = object(value, "request");
-  exactKeys(request, ["evaluationId", "normalizationId", "evaluation"], "request");
+  const request = object2(value, "request");
+  exactKeys2(request, ["evaluationId", "normalizationId", "evaluation"], "request");
   const evaluationId = text(request.evaluationId, "evaluationId");
   const normalizationId = text(request.normalizationId, "normalizationId");
   const evaluation = parseFitEvaluationRequest(request.evaluation);
@@ -2588,22 +2900,31 @@ export {
   FitSnapshotGateway,
   PRODUCTION_EVALUATOR_NAME,
   PRODUCTION_EVALUATOR_VERSION,
+  PRODUCT_EVALUATOR_VERSION,
   PostgrestGateway,
   calculateReviewedFinancialNormalization,
   equalExactDecimals,
   executeFitEvaluation,
+  executeProductFitEvaluation,
+  fitEvaluationRequestFromProductAssembly,
+  isProductFitEvaluationRequest,
   loadFitEvaluationSnapshot,
+  loadProductFitEvaluationSnapshot,
   multiplyExactDecimals,
   parseFitEvaluationRequest,
   parseFitEvaluationResumeRequest,
   parseFitFinancialNormalizationDraftRequest,
   parseFitFinancialNormalizationReviewRequest,
+  parseProductFitEvaluationRequest,
+  parseProductFitIntentAssembly,
   persistFitEvaluation,
   postgresIn,
   prepareFitFinancialNormalization,
   requireOne,
   resolveFitContract,
   resolveFitEvaluationInput,
+  resolveProductFitEvaluationInput,
   resumeFitEvaluation,
-  subtractExactDecimals
+  subtractExactDecimals,
+  taxonomyConceptIdsFromProductAssembly
 };

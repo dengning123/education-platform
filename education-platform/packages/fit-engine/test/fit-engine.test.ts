@@ -45,6 +45,7 @@ test("all-unknown fixture emits exactly six categorical limiting decisions", () 
     assert.equal(decision.assessment, "UNKNOWN");
     assert.equal(decision.confidence, "LOW");
     assert.equal(decision.evidenceCoverage, "INSUFFICIENT");
+    assert.equal(decision.signals.length, 0);
     assert.ok(decision.reasons.length >= 1);
     assert.ok(decision.limitingInputs.length >= 1);
   }

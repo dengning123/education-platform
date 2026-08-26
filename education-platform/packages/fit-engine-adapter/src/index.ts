@@ -4,6 +4,7 @@ export * from "./financial-normalization.js";
 export * from "./input-resolver.js";
 export * from "./normalization-workflow.js";
 export * from "./persistence.js";
+export * from "./product-intent-assembly.js";
 export * from "./registry-resolver.js";
 export * from "./request.js";
 export * from "./snapshot.js";

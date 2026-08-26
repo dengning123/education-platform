@@ -2,7 +2,7 @@ export const MANIFEST_SCHEMA_VERSION = "PHASE4_LAYERED_GATE_MANIFEST_V1";
 export const LIGHT_MIN_FREE_BYTES = 1024 ** 3;
 export const HEAVY_MIN_FREE_BYTES = 8 * 1024 ** 3;
 export const FROZEN_FIT_RUNTIME_SHA256 =
-  "0c6344b98b93ea38282236ac437bd8bc71eec3804bc103d7b09ad6ef790fd5b1";
+  "2cad2a2f2ea1d01b6bc1863cbbda6350e84043c865e85f266e01d0512c8dcc9f";
 
 function deepFreeze(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
@@ -49,6 +49,21 @@ export const MIGRATIONS_001_026 = Object.freeze([
   "supabase/migrations/202608250026_eligibility_production_assembly_capability.sql"
 ]);
 
+export const MIGRATIONS_001_027 = Object.freeze([
+  ...MIGRATIONS_001_026,
+  "supabase/migrations/202608250027_fit_intent_product_capability.sql"
+]);
+
+export const MIGRATIONS_001_028 = Object.freeze([
+  ...MIGRATIONS_001_027,
+  "supabase/migrations/202608260028_fit_product_manifest_compatibility_registration.sql"
+]);
+
+export const MIGRATIONS_001_029 = Object.freeze([
+  ...MIGRATIONS_001_028,
+  "supabase/migrations/202608260029_fit_intent_privacy_deletion_compatibility.sql"
+]);
+
 export const SQL_TESTS_001_016 = Object.freeze([
   "supabase/tests/001_education_foundation.sql",
   "supabase/tests/002_phase2_eligibility.sql",
@@ -76,6 +91,21 @@ export const SQL_TESTS_001_017 = Object.freeze([
 export const SQL_TESTS_001_018 = Object.freeze([
   ...SQL_TESTS_001_017,
   "supabase/tests/018_phase026_eligibility_production_assembly.sql"
+]);
+
+export const SQL_TESTS_001_019 = Object.freeze([
+  ...SQL_TESTS_001_018,
+  "supabase/tests/019_phase027_fit_intent_product_capability.sql"
+]);
+
+export const SQL_TESTS_001_020 = Object.freeze([
+  ...SQL_TESTS_001_019,
+  "supabase/tests/020_phase028_fit_product_manifest_compatibility_registration.sql"
+]);
+
+export const SQL_TESTS_001_021 = Object.freeze([
+  ...SQL_TESTS_001_020,
+  "supabase/tests/021_phase029_fit_intent_privacy_deletion_compatibility.sql"
 ]);
 
 const orderedSqlFiles = Object.freeze([
@@ -113,6 +143,28 @@ const orderedSqlFiles001018 = Object.freeze([
   ...orderedSqlFiles,
   MIGRATIONS_001_026[25],
   SQL_TESTS_001_018[17]
+]);
+
+const orderedSqlFiles001019 = Object.freeze([
+  ...orderedSqlFiles001018,
+  MIGRATIONS_001_027[26],
+  SQL_TESTS_001_019[18]
+]);
+
+const orderedSqlFiles001020 = Object.freeze([
+  ...orderedSqlFiles001019,
+  MIGRATIONS_001_028[27],
+  SQL_TESTS_001_020[19]
+]);
+
+const orderedSqlFiles001021 = Object.freeze([
+  ...orderedSqlFiles001018,
+  MIGRATIONS_001_027[26],
+  MIGRATIONS_001_028[27],
+  SQL_TESTS_001_020[19],
+  MIGRATIONS_001_029[28],
+  SQL_TESTS_001_019[18],
+  SQL_TESTS_001_021[20]
 ]);
 
 const packagePrerequisite =
@@ -158,6 +210,25 @@ export const COMMAND_CATALOG = deepFreeze({
     ],
     prerequisites: [packagePrerequisite],
     display: "pnpm exec vitest run <closed Profile contract/security test list>"
+  },
+  "web.intent-evaluation-contracts-targeted": {
+    kind: "spawn",
+    classification: "light",
+    tool: "pnpm",
+    cwd: "apps/web",
+    args: [
+      "exec", "vitest", "run",
+      "src/lib/intent/contracts.test.ts",
+      "src/lib/intent/service.test.ts",
+      "src/lib/intent/http-boundary.test.ts",
+      "src/lib/intent/client.test.ts",
+      "src/lib/evaluation/contracts.test.ts",
+      "src/lib/evaluation/service.test.ts",
+      "src/lib/evaluation/http-boundary.test.ts",
+      "tests/source-boundary.test.ts"
+    ],
+    prerequisites: [packagePrerequisite],
+    display: "pnpm exec vitest run <closed M027 Intent/Fit orchestration test list>"
   },
   "repo.diff-check": {
     kind: "spawn",
@@ -215,6 +286,54 @@ export const COMMAND_CATALOG = deepFreeze({
     prerequisites: ["Docker image postgres:17 is available locally."],
     display: "disposable postgres:17 -> migrations 001-026 through the existing non-super runner"
   },
+  "db.pg15-clean-001-027-non-super": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "non-super-clean",
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> migrations 001-027 through the existing non-super runner"
+  },
+  "db.pg17-clean-001-027-non-super": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "non-super-clean",
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-027 through the existing non-super runner"
+  },
+  "db.pg15-clean-001-028-non-super": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "non-super-clean",
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> migrations 001-028 through the existing non-super runner"
+  },
+  "db.pg17-clean-001-028-non-super": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "non-super-clean",
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-028 through the existing non-super runner"
+  },
+  "db.pg15-clean-001-029-non-super": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "non-super-clean",
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> migrations 001-029 through the existing non-super runner"
+  },
+  "db.pg17-clean-001-029-non-super": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "non-super-clean",
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-029 through the existing non-super runner"
+  },
   "db.ordered-sql-001-016": {
     kind: "docker-postgres",
     classification: "heavy",
@@ -241,6 +360,33 @@ export const COMMAND_CATALOG = deepFreeze({
     files: orderedSqlFiles001018,
     prerequisites: ["Docker image postgres:15 is available locally."],
     display: "disposable postgres:15 -> ordered migration/test boundary sequence 001-018"
+  },
+  "db.ordered-sql-001-019": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "sql-files",
+    files: orderedSqlFiles001019,
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> ordered migration/test boundary sequence 001-019"
+  },
+  "db.ordered-sql-001-020": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "sql-files",
+    files: orderedSqlFiles001020,
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> ordered migration/test boundary sequence 001-020"
+  },
+  "db.ordered-sql-001-021": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "sql-files",
+    files: orderedSqlFiles001021,
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> ordered migration/test boundary sequence 001-021"
   },
   "db.phase024-populated-023-024": {
     kind: "docker-postgres",
@@ -284,6 +430,48 @@ export const COMMAND_CATALOG = deepFreeze({
     prerequisites: ["Docker image postgres:15 is available locally."],
     display: "disposable postgres:15 -> populated 025 fixture -> Migration 026 -> assertion"
   },
+  "db.phase027-populated-026-027": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "sql-files",
+    files: [
+      ...MIGRATIONS_001_026,
+      "supabase/tests/_phase027_populated_upgrade_fixture.sql",
+      MIGRATIONS_001_027[26],
+      "supabase/tests/_phase027_populated_upgrade_assert.sql"
+    ],
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> populated 026 fixture -> Migration 027 -> assertion"
+  },
+  "db.phase028-populated-027-028": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "sql-files",
+    files: [
+      ...MIGRATIONS_001_027,
+      "supabase/tests/_phase028_populated_upgrade_fixture.sql",
+      MIGRATIONS_001_028[27],
+      "supabase/tests/_phase028_populated_upgrade_assert.sql"
+    ],
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> populated 027 capture -> Migration 028 -> legacy/build assertion"
+  },
+  "db.phase029-populated-028-029": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 15,
+    scenario: "sql-files",
+    files: [
+      ...MIGRATIONS_001_028,
+      "supabase/tests/_phase029_populated_upgrade_fixture.sql",
+      MIGRATIONS_001_029[28],
+      "supabase/tests/_phase029_populated_upgrade_assert.sql"
+    ],
+    prerequisites: ["Docker image postgres:15 is available locally."],
+    display: "disposable postgres:15 -> populated M027 state at 028 -> Migration 029 -> zero-residue assertion"
+  },
   "db.phase024-behavior-security-privacy": {
     kind: "docker-postgres",
     classification: "heavy",
@@ -310,6 +498,54 @@ export const COMMAND_CATALOG = deepFreeze({
     files: [...MIGRATIONS_001_026, SQL_TESTS_001_018[17]],
     prerequisites: ["Docker image postgres:17 is available locally."],
     display: "disposable postgres:17 -> migrations 001-026 -> M026 behavior/security/idempotency/privacy"
+  },
+  "db.phase027-intent-security-privacy": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "sql-files",
+    files: [...MIGRATIONS_001_029, SQL_TESTS_001_019[18]],
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-029 -> M027 behavior/security/idempotency/privacy after forward compatibility repair"
+  },
+  "db.phase028-product-build-registration": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "sql-files",
+    files: [...MIGRATIONS_001_028, SQL_TESTS_001_020[19]],
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-028 -> product build identity/ACL test 020"
+  },
+  "db.phase029-intent-privacy-compatibility": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "sql-files",
+    files: [...MIGRATIONS_001_029, SQL_TESTS_001_021[20]],
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-029 -> M027 privacy compatibility/adversarial test 021"
+  },
+  "db.phase027-intent-concurrency": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "sql-files",
+    files: [...MIGRATIONS_001_027, "supabase/tests/_phase027_concurrency_probe.sql"],
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-027 -> M027 concurrency probe"
+  },
+  "db.phase029-privacy-concurrency": {
+    kind: "docker-postgres",
+    classification: "heavy",
+    major: 17,
+    scenario: "sql-files",
+    files: [
+      ...MIGRATIONS_001_029,
+      "supabase/tests/_phase029_privacy_concurrency_probe.sql"
+    ],
+    prerequisites: ["Docker image postgres:17 is available locally."],
+    display: "disposable postgres:17 -> migrations 001-029 -> privacy deletion versus mutate/freeze/evaluation concurrency"
   },
   "db.phase024-definition-concurrency": {
     kind: "docker-postgres",
@@ -356,6 +592,33 @@ export const COMMAND_CATALOG = deepFreeze({
     prerequisites: [localSupabasePrerequisite],
     display: "supabase db reset --local (migrations 001-026)"
   },
+  "db.supabase-reset-001-027": {
+    kind: "spawn",
+    classification: "heavy",
+    tool: "supabase",
+    cwd: ".",
+    args: ["db", "reset", "--local"],
+    prerequisites: [localSupabasePrerequisite],
+    display: "supabase db reset --local (migrations 001-027)"
+  },
+  "db.supabase-reset-001-028": {
+    kind: "spawn",
+    classification: "heavy",
+    tool: "supabase",
+    cwd: ".",
+    args: ["db", "reset", "--local"],
+    prerequisites: [localSupabasePrerequisite],
+    display: "supabase db reset --local (migrations 001-028)"
+  },
+  "db.supabase-reset-001-029": {
+    kind: "spawn",
+    classification: "heavy",
+    tool: "supabase",
+    cwd: ".",
+    args: ["db", "reset", "--local"],
+    prerequisites: [localSupabasePrerequisite],
+    display: "supabase db reset --local (migrations 001-029)"
+  },
   "db.local-auth-postgrest-profile-matrix": {
     kind: "local-auth-sequence",
     classification: "heavy",
@@ -396,6 +659,20 @@ export const COMMAND_CATALOG = deepFreeze({
     script: "supabase/tests/_phase026_local_auth_postgrest_e2e.mjs",
     prerequisites: [localSupabasePrerequisite],
     display: "restart exact local Auth container -> wait healthy -> Phase 026 assembly E2E"
+  },
+  "db.local-auth-postgrest-phase027": {
+    kind: "local-auth-sequence",
+    classification: "heavy",
+    scripts: ["supabase/tests/_phase027_local_auth_postgrest_e2e.mjs"],
+    prerequisites: [localSupabasePrerequisite],
+    display: "node Phase 027 real Auth/JWT/PostgREST Intent lifecycle and assembly E2E"
+  },
+  "db.local-auth-restart-phase027": {
+    kind: "local-auth-restart",
+    classification: "heavy",
+    script: "supabase/tests/_phase027_local_auth_postgrest_e2e.mjs",
+    prerequisites: [localSupabasePrerequisite],
+    display: "restart exact local Auth container -> wait healthy -> Phase 027 Intent E2E"
   },
   "backend.eligibility-full": {
     kind: "spawn",
@@ -525,7 +802,7 @@ export const COMMAND_CATALOG = deepFreeze({
   "repo.frozen-invariant-audit": {
     kind: "frozen-audit",
     classification: "light",
-    display: "internal: Migration 001-025 + semantic/Edge/evaluator/fingerprint/runtime drift audit"
+    display: "internal: Migration 001-026 + semantic/Edge/evaluator/fingerprint/runtime drift audit"
   },
   "release.remote-migration-history-readonly": {
     kind: "spawn",
@@ -569,37 +846,55 @@ export const GATE_REQUIRED_ORDERS = Object.freeze({
   FAST: Object.freeze([
     "preflight.light",
     "tooling.layered-gate-tests",
+    "web.intent-evaluation-contracts-targeted",
     "web.profile-contracts-targeted",
     "repo.diff-check"
   ]),
   RELEVANT: Object.freeze([
     "preflight.heavy",
-    "db.pg17-clean-001-026-non-super",
-    "db.phase026-assembly-security-privacy",
-    "db.phase026-populated-025-026",
-    "db.supabase-reset-001-026",
-    "db.local-auth-postgrest-phase026",
+    "db.pg17-clean-001-029-non-super",
+    "db.phase027-intent-security-privacy",
+    "db.phase028-product-build-registration",
+    "db.phase029-intent-privacy-compatibility",
+    "db.phase028-populated-027-028",
+    "db.phase029-populated-028-029",
+    "db.phase029-privacy-concurrency",
+    "db.supabase-reset-001-029",
+    "db.local-auth-postgrest-phase027",
+    "backend.fit-full",
+    "backend.adapter-full",
     "web.real-local-profile-lifecycle",
-    "web.profile-contracts-targeted",
+    "web.intent-evaluation-contracts-targeted",
+    "fit.runtime-reproducibility",
     "repo.diff-check"
   ]),
   BASELINE: Object.freeze([
     "preflight.heavy",
-    "db.pg15-clean-001-026-non-super",
-    "db.pg17-clean-001-026-non-super",
-    "db.ordered-sql-001-018",
+    "db.pg15-clean-001-029-non-super",
+    "db.pg17-clean-001-029-non-super",
+    "db.ordered-sql-001-021",
     "db.phase024-populated-023-024",
     "db.phase025-populated-024-025",
     "db.phase026-populated-025-026",
-    "db.supabase-reset-001-026",
+    "db.phase027-populated-026-027",
+    "db.phase028-populated-027-028",
+    "db.phase029-populated-028-029",
+    "db.supabase-reset-001-029",
     "db.phase024-behavior-security-privacy",
     "db.phase025-discovery-security-privacy",
     "db.phase026-assembly-security-privacy",
+    "db.phase027-intent-security-privacy",
+    "db.phase028-product-build-registration",
+    "db.phase029-intent-privacy-compatibility",
     "db.phase024-definition-concurrency",
     "db.phase020-profile-fork-concurrency",
+    "db.phase027-intent-concurrency",
+    "db.phase029-privacy-concurrency",
     "db.local-auth-postgrest-profile-matrix",
     "db.local-auth-postgrest-phase026",
     "db.local-auth-restart-phase026",
+    "db.local-auth-postgrest-phase027",
+    "db.local-auth-restart-phase027",
     "backend.eligibility-full",
     "backend.fit-full",
     "backend.adapter-full",
@@ -608,6 +903,7 @@ export const GATE_REQUIRED_ORDERS = Object.freeze({
     "web.unit-contract-security-full",
     "web.browser-auth-profile-full",
     "web.real-local-profile-lifecycle",
+    "web.intent-evaluation-contracts-targeted",
     "web.lint-full",
     "web.typecheck-full",
     "web.production-build-full",
@@ -627,16 +923,13 @@ export const GATE_REQUIRED_ORDERS = Object.freeze({
 });
 
 export const FROZEN_AUDIT_PATHS = Object.freeze([
-  ...MIGRATIONS_001_025,
+  ...MIGRATIONS_001_027,
   "packages/eligibility-engine/src",
   "packages/fit-engine/src",
-  "packages/fit-engine-adapter/src",
-  "supabase/functions/fit-evaluate",
   "supabase/functions/fit-normalization-prepare",
   "supabase/functions/fit-normalization-review",
   "supabase/functions/fit-normalization-resume",
-  "supabase/functions/_shared/http-boundary.js",
-  "supabase/functions/_shared/fit-runtime.js"
+  "supabase/functions/_shared/http-boundary.js"
 ]);
 
 export const LOCAL_AUTH_DB_CONTAINER = "supabase_db_capibara-education-platform";

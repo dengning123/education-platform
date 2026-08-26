@@ -12,7 +12,7 @@
   },
   "gates": {
     "FAST": {
-      "description": "Fast, targeted feedback for the current bounded Profile lifecycle-closure increment.",
+      "description": "Fast, targeted feedback for the bounded M029 M027 privacy-deletion compatibility repair.",
       "classification": "light",
       "prerequisites": [
         "Repository-local Node dependencies are installed from committed lockfiles when a referenced package test is run.",
@@ -28,6 +28,10 @@
           "why": "Prove the closed manifest, runner, preflight, timing, and adversarial contracts."
         },
         {
+          "id": "web.intent-evaluation-contracts-targeted",
+          "why": "Catch M027 Intent command, same-origin boundary, and high-level Fit assembly defects quickly."
+        },
+        {
           "id": "web.profile-contracts-targeted",
           "why": "Catch Profile DTO, command-parity, source-boundary, semantic-copy, and no-AI-authoritative-autofill defects quickly."
         },
@@ -38,7 +42,7 @@
       ]
     },
     "RELEVANT": {
-      "description": "Executable-path proof for the current bounded Migration 026 Eligibility production-assembly increment.",
+      "description": "Executable-path proof for the M029 transaction-bound M027 privacy-deletion compatibility repair.",
       "classification": "heavy",
       "prerequisites": [
         "Docker is running and PostgreSQL 17 plus the current Supabase images are available locally.",
@@ -51,32 +55,60 @@
           "why": "Require safe disk headroom and read-only Docker health evidence before database work."
         },
         {
-          "id": "db.pg17-clean-001-026-non-super",
-          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner through Migration 026."
+          "id": "db.pg17-clean-001-029-non-super",
+          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner through Migration 029."
         },
         {
-          "id": "db.phase026-assembly-security-privacy",
-          "why": "Run Migration 026 assembly, ACL, idempotency, adversarial, and privacy SQL proof."
+          "id": "db.phase027-intent-security-privacy",
+          "why": "Run Migration 027 lifecycle, assembly, ACL, idempotency, adversarial, and privacy SQL proof."
         },
         {
-          "id": "db.phase026-populated-025-026",
-          "why": "Prove the populated 025 to 026 forward-upgrade leaves completed Eligibility identity unchanged."
+          "id": "db.phase028-product-build-registration",
+          "why": "Prove the separately versioned product evaluator build and unchanged legacy build/ACL contract."
         },
         {
-          "id": "db.supabase-reset-001-026",
+          "id": "db.phase029-intent-privacy-compatibility",
+          "why": "Prove only the existing transaction-bound student privacy cascade can pass the M027 product guard."
+        },
+        {
+          "id": "db.phase028-populated-027-028",
+          "why": "Prove the populated 027 to 028 additive registration preserves legacy build and completed evaluation rows."
+        },
+        {
+          "id": "db.phase029-populated-028-029",
+          "why": "Prove a populated M027 graph is unchanged by M029 and then closes with zero student-linked residue."
+        },
+        {
+          "id": "db.phase029-privacy-concurrency",
+          "why": "Prove deletion serializes with M027 mutation, freeze, and Fit evaluation without resurrection or deadlock."
+        },
+        {
+          "id": "db.supabase-reset-001-029",
           "why": "Exercise the actual local Supabase migration runner against the complete migration tree."
         },
         {
-          "id": "db.local-auth-postgrest-phase026",
-          "why": "Exercise real Auth-issued JWTs, direct PostgREST, concurrent exact retry, owner isolation, and closed M026 DTO/error behavior."
+          "id": "db.local-auth-postgrest-phase027",
+          "why": "Exercise real Auth-issued JWTs, direct PostgREST Intent lifecycle, assembly, owner isolation, and closed M027 DTO/error behavior."
+        },
+        {
+          "id": "backend.fit-full",
+          "why": "Prove the frozen evaluator still yields categorical UNKNOWN law with zero omission signals."
+        },
+        {
+          "id": "backend.adapter-full",
+          "why": "Prove the product-only parser, authoritative disposition mapping, and legacy adapter parity."
         },
         {
           "id": "web.real-local-profile-lifecycle",
           "why": "Prove the complete Browser to Next to Auth to PostgREST to PostgreSQL lifecycle and zero-residue cleanup."
         },
         {
-          "id": "web.profile-contracts-targeted",
-          "why": "Prove the browser/server Profile command and closed DTO contract consumed by the SQL capability."
+          "id": "web.intent-evaluation-contracts-targeted",
+          "why": "Prove browser Intent commands and high-level Fit requests cannot supply internal resolver identities."
+        },
+        {
+          "id": "fit.runtime-reproducibility",
+          "why": "Rebuild and verify the separately registered product-aware runtime identity."
         },
         {
           "id": "repo.diff-check",
@@ -99,15 +131,15 @@
           "why": "Block heavy proof when host disk or read-only Docker health signals are unsafe."
         },
         {
-          "id": "db.pg15-clean-001-026-non-super",
-          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 026."
+          "id": "db.pg15-clean-001-029-non-super",
+          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 029."
         },
         {
-          "id": "db.pg17-clean-001-026-non-super",
-          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path through Migration 026."
+          "id": "db.pg17-clean-001-029-non-super",
+          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path through Migration 029."
         },
         {
-          "id": "db.ordered-sql-001-018",
+          "id": "db.ordered-sql-001-021",
           "why": "Preserve version-scoped ordered SQL suites at their authoritative migration boundaries."
         },
         {
@@ -123,7 +155,19 @@
           "why": "Prove the populated Migration 025 to 026 forward-upgrade contract."
         },
         {
-          "id": "db.supabase-reset-001-026",
+          "id": "db.phase027-populated-026-027",
+          "why": "Prove the populated Migration 026 to 027 forward-upgrade contract."
+        },
+        {
+          "id": "db.phase028-populated-027-028",
+          "why": "Prove additive M028 registration preserves the legacy evaluator build and completed evaluations."
+        },
+        {
+          "id": "db.phase029-populated-028-029",
+          "why": "Prove populated M027 state is byte-semantic stable across M029 and deletable only through the authorized lifecycle."
+        },
+        {
+          "id": "db.supabase-reset-001-029",
           "why": "Prove the actual local Supabase clean runner path."
         },
         {
@@ -139,12 +183,32 @@
           "why": "Run the complete Migration 026 assembly, ACL, idempotency, adversarial, and privacy suite."
         },
         {
+          "id": "db.phase027-intent-security-privacy",
+          "why": "Run the complete Migration 027 Intent lifecycle, assembly, ACL, idempotency, adversarial, and privacy suite."
+        },
+        {
+          "id": "db.phase028-product-build-registration",
+          "why": "Run the independent M028 product build identity, legacy preservation, and ACL suite."
+        },
+        {
+          "id": "db.phase029-intent-privacy-compatibility",
+          "why": "Run the M029 authorized-cascade, direct-role, spoof, stale, cross-student, rollback, and zero-residue suite."
+        },
+        {
           "id": "db.phase024-definition-concurrency",
           "why": "Preserve the Migration 024 definition concurrency proof."
         },
         {
           "id": "db.phase020-profile-fork-concurrency",
           "why": "Preserve the existing Profile fork single-active-draft concurrency regression."
+        },
+        {
+          "id": "db.phase027-intent-concurrency",
+          "why": "Prove M027 concurrent lifecycle and revision behavior."
+        },
+        {
+          "id": "db.phase029-privacy-concurrency",
+          "why": "Prove privacy deletion shares the established lifecycle lock order with mutation, freeze, and Fit evaluation."
         },
         {
           "id": "db.local-auth-postgrest-profile-matrix",
@@ -157,6 +221,14 @@
         {
           "id": "db.local-auth-restart-phase026",
           "why": "Re-run the M026 production assembly E2E after an exact local Auth service restart."
+        },
+        {
+          "id": "db.local-auth-postgrest-phase027",
+          "why": "Run the real Auth/JWT/PostgREST M027 lifecycle and assembly security matrix."
+        },
+        {
+          "id": "db.local-auth-restart-phase027",
+          "why": "Re-run the M027 lifecycle E2E after an exact local Auth service restart."
         },
         {
           "id": "backend.eligibility-full",
@@ -191,6 +263,10 @@
           "why": "Run the complete real local Browser to Next to Auth to PostgREST to database lifecycle."
         },
         {
+          "id": "web.intent-evaluation-contracts-targeted",
+          "why": "Preserve the M027 browser Intent and high-level Fit orchestration security proof."
+        },
+        {
           "id": "web.lint-full",
           "why": "Preserve zero-warning Web lint proof."
         },
@@ -216,7 +292,7 @@
         },
         {
           "id": "repo.frozen-invariant-audit",
-          "why": "Fail on Migration 001-025, semantic package, Edge boundary, evaluator, fingerprint, or runtime drift."
+          "why": "Fail on Migration 001-027, frozen semantic packages, Financial Edge boundary, fingerprint law, or runtime identity drift."
         },
         {
           "id": "repo.diff-check",

@@ -1,9 +1,10 @@
 import { FitAdapterError, FitSnapshotGateway, type FitDatabaseGateway } from "./database-gateway.js";
 import type { FitEvaluationRequest } from "./request.js";
 
-export async function loadFitEvaluationSnapshot(
+async function loadFitEvaluationSnapshotWith(
   database: FitDatabaseGateway,
   request: FitEvaluationRequest,
+  snapshotFunction: "get_fit_evaluation_snapshot_v016" | "get_fit_product_evaluation_snapshot_v028",
   evaluationId?: string,
 ): Promise<FitSnapshotGateway> {
   let resumeSnapshot: Readonly<Record<string, readonly Record<string, unknown>[]>> = {};
@@ -30,7 +31,7 @@ export async function loadFitEvaluationSnapshot(
     ...normalizationObservationIds,
     ...basisObservationIds,
   ])];
-  const snapshot = await database.rpc<unknown>("get_fit_evaluation_snapshot_v016", {
+  const snapshot = await database.rpc<unknown>(snapshotFunction, {
     p_profile_version_id: request.profileVersionId,
     p_intent_set_id: request.intentSetId,
     p_program_version_id: request.programVersionId,
@@ -53,4 +54,22 @@ export async function loadFitEvaluationSnapshot(
     }
   }
   return new FitSnapshotGateway(merged);
+}
+
+export function loadFitEvaluationSnapshot(
+  database: FitDatabaseGateway,
+  request: FitEvaluationRequest,
+  evaluationId?: string,
+): Promise<FitSnapshotGateway> {
+  return loadFitEvaluationSnapshotWith(database, request, "get_fit_evaluation_snapshot_v016", evaluationId);
+}
+
+export function loadProductFitEvaluationSnapshot(
+  database: FitDatabaseGateway,
+  request: FitEvaluationRequest,
+): Promise<FitSnapshotGateway> {
+  if (request.evidence.approvedFinancialNormalizationIds.length !== 0) {
+    throw new FitAdapterError("Product Fit evaluation cannot start from a reviewed Financial normalization", 400);
+  }
+  return loadFitEvaluationSnapshotWith(database, request, "get_fit_product_evaluation_snapshot_v028");
 }

@@ -58,13 +58,40 @@ describe("frontend source boundary", () => {
     expect(service).not.toMatch(/service.?role|management.?token|database.?password/i);
   });
 
-  it("adds only the approved Profile and evaluation capability routes", async () => {
+  it("adds only the approved Profile, Intent, and evaluation capability routes", async () => {
     const files = (await sourceFiles(sourceRoot)).map((file) => relative(root, file));
     expect(files.filter((file) => file.startsWith("src/app/api/")).sort()).toEqual([
       "src/app/api/evaluation/[capability]/route.ts",
+      "src/app/api/intent/[capability]/route.ts",
       "src/app/api/profile/[capability]/route.ts",
     ]);
     expect(files.some((file) => /service-role|management-token|database-password/i.test(file))).toBe(false);
+  });
+
+  it("keeps M027 Intent behind the session service and delegates authoritative Fit assembly to the Edge", async () => {
+    const intent = await readFile(join(root, "src/lib/intent/service.ts"), "utf8");
+    const evaluation = await readFile(join(root, "src/lib/evaluation/service.ts"), "utf8");
+    expect(intent).toMatch(/^import "server-only";/);
+    expect(intent).toContain('this.rpc("mutate_fit_intent_draft_v027"');
+    expect(intent).toContain('this.rpc("freeze_fit_intent_draft_v027"');
+    expect(evaluation).toContain('schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027"');
+    expect(evaluation).not.toContain('this.supabase.rpc("get_fit_evaluation_assembly_v027"');
+    expect(intent).not.toMatch(/service.?role|management.?token|database.?password/i);
+    expect(evaluation).not.toMatch(/service.?role|management.?token|database.?password/i);
+  });
+
+  it("runs the real-local Fit path with the exact disposable Edge Runtime and preserves JWT verification", async () => {
+    const harness = await readFile(join(root, "tests/real-local/start-next.mjs"), "utf8");
+    expect(harness).toContain('["functions", "serve", "--env-file", edgeConfigurationFile, "--log-level", "info"]');
+    expect(harness).toContain('"supabase_edge_runtime_capibara-education-platform"');
+    expect(harness).toContain('["inspect", "--format", "{{.State.Status}}", edgeRuntimeContainer]');
+    expect(harness).toContain('functions.kill("SIGTERM")');
+    expect(harness).toContain('"FIT_EDGE_ALLOWED_ORIGINS=none"');
+    expect(harness).toContain('"FIT_EDGE_SEMANTIC_RELEASE=fit-v0.1"');
+    expect(harness).toContain('"FIT_EDGE_DEPLOYED_BUILD=phase4b-m027-real-local"');
+    expect(harness).toContain("mode: 0o600");
+    expect(harness).toContain("rmSync(edgeConfigurationDirectory, { recursive: true, force: true })");
+    expect(harness).not.toContain("--no-verify-jwt");
   });
 
   it("keeps test adapters and production bypasses out of application source", async () => {

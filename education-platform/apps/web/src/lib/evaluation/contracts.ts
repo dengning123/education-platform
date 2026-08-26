@@ -75,76 +75,96 @@ export type FitConnectionRequest = Readonly<{
   profileVersionId: string;
   intentSetId: string;
   programVersionId: string;
-  taxonomyReleaseCode: string;
-  supersedesEvaluationId: string | null;
-  eligibilityContextEvaluationId: string | null;
-  evidence: Readonly<{
-    canonicalObservationIds: readonly string[];
-    catalogMappingIds: readonly string[];
-    studentCourseIds: readonly string[];
-    studentMappingIds: readonly string[];
-    taxonomyConceptIds: readonly string[];
-    contextClaimIds: readonly string[];
-    contextMappingIds: readonly string[];
-    accessContextId: string | null;
-    directFinancialComparisons: readonly Readonly<{
-      financialIntentId: string;
-      amountObservationId: string;
-      billingBasisObservationId: string;
-    }>[];
-    approvedFinancialNormalizationIds: readonly string[];
-  }>;
+  completedEligibilityEvaluationId: string | null;
+  operationId: string;
 }>;
 
 export function parseFitConnectionRequest(value: unknown): FitConnectionRequest {
   const request = object(value, "request");
-  exactKeys(request, [
-    "profileVersionId", "intentSetId", "programVersionId", "taxonomyReleaseCode",
-    "supersedesEvaluationId", "eligibilityContextEvaluationId", "evidence",
-  ], "request");
-  const evidence = object(request.evidence, "evidence");
-  exactKeys(evidence, [
-    "canonicalObservationIds", "catalogMappingIds", "studentCourseIds", "studentMappingIds",
-    "taxonomyConceptIds", "contextClaimIds", "contextMappingIds", "accessContextId",
-    "directFinancialComparisons", "approvedFinancialNormalizationIds",
-  ], "evidence");
-  if (!Array.isArray(evidence.directFinancialComparisons) || evidence.directFinancialComparisons.length > MAX_LIST) {
-    throw new EvaluationContractError("directFinancialComparisons must be a bounded array");
+  const required = ["profileVersionId", "intentSetId", "programVersionId", "operationId"];
+  const allowed = [...required, "completedEligibilityEvaluationId"];
+  if (Object.keys(request).some((key) => !allowed.includes(key)) || required.some((key) => !(key in request))) {
+    throw new EvaluationContractError("request must use the exact closed contract");
   }
-  const directFinancialComparisons = evidence.directFinancialComparisons.map((item, index) => {
-    const row = object(item, `directFinancialComparisons[${index}]`);
-    exactKeys(row, ["financialIntentId", "amountObservationId", "billingBasisObservationId"], `directFinancialComparisons[${index}]`);
-    return {
-      financialIntentId: uuid(row.financialIntentId, "financialIntentId"),
-      amountObservationId: uuid(row.amountObservationId, "amountObservationId"),
-      billingBasisObservationId: uuid(row.billingBasisObservationId, "billingBasisObservationId"),
-    };
-  });
-  if (new Set(directFinancialComparisons.map((row) => row.financialIntentId)).size !== directFinancialComparisons.length) {
-    throw new EvaluationContractError("Only one direct Financial comparison is allowed per intent");
-  }
-  const taxonomyReleaseCode = text(request.taxonomyReleaseCode, "taxonomyReleaseCode", 64);
-  if (!/^[A-Za-z0-9._-]+$/.test(taxonomyReleaseCode)) throw new EvaluationContractError("taxonomyReleaseCode is invalid");
   return {
     profileVersionId: uuid(request.profileVersionId, "profileVersionId"),
     intentSetId: uuid(request.intentSetId, "intentSetId"),
     programVersionId: uuid(request.programVersionId, "programVersionId"),
-    taxonomyReleaseCode,
-    supersedesEvaluationId: nullableUuid(request.supersedesEvaluationId, "supersedesEvaluationId"),
-    eligibilityContextEvaluationId: nullableUuid(request.eligibilityContextEvaluationId, "eligibilityContextEvaluationId"),
-    evidence: {
-      canonicalObservationIds: stringArray(evidence.canonicalObservationIds, "canonicalObservationIds", uuid),
-      catalogMappingIds: stringArray(evidence.catalogMappingIds, "catalogMappingIds", uuid),
-      studentCourseIds: stringArray(evidence.studentCourseIds, "studentCourseIds", uuid),
-      studentMappingIds: stringArray(evidence.studentMappingIds, "studentMappingIds", uuid),
-      taxonomyConceptIds: stringArray(evidence.taxonomyConceptIds, "taxonomyConceptIds", uuid),
-      contextClaimIds: stringArray(evidence.contextClaimIds, "contextClaimIds", uuid),
-      contextMappingIds: stringArray(evidence.contextMappingIds, "contextMappingIds", uuid),
-      accessContextId: nullableUuid(evidence.accessContextId, "accessContextId"),
-      directFinancialComparisons,
-      approvedFinancialNormalizationIds: stringArray(evidence.approvedFinancialNormalizationIds, "approvedFinancialNormalizationIds", uuid),
-    },
+    completedEligibilityEvaluationId: "completedEligibilityEvaluationId" in request
+      ? nullableUuid(request.completedEligibilityEvaluationId, "completedEligibilityEvaluationId")
+      : null,
+    operationId: uuid(request.operationId, "operationId"),
   };
+}
+
+export type FitEvaluationAssembly = Readonly<{
+  schemaVersion: "FIT_EVALUATION_ASSEMBLY_V027";
+  profileVersionId: string;
+  intentSetId: string;
+  programVersionId: string;
+  intentSnapshotHash: string;
+  dimensions: readonly Readonly<{
+    dimension: (typeof FIT_INTENT_DIMENSIONS)[number];
+    disposition: "DECLARED" | "EXPLICIT_NOT_SUPPLIED";
+    inputAvailability: "INCLUDED" | "NOT_SUPPLIED";
+    completenessDomain: "GOALS" | "PREFERENCES";
+    completenessId: string;
+    profileCompleteness: "COMPLETE" | "PARTIAL" | "UNKNOWN";
+  }>[];
+  intentDocument: FitIntentDocument;
+}>;
+
+export function parseFitEvaluationAssembly(value: unknown): FitEvaluationAssembly {
+  const response = object(value, "Fit assembly response");
+  exactKeys(response, ["schemaVersion", "profileVersionId", "intentSetId", "programVersionId", "intentSnapshotHash", "dimensions", "intentDocument"], "Fit assembly response");
+  if (response.schemaVersion !== "FIT_EVALUATION_ASSEMBLY_V027" || !Array.isArray(response.dimensions) || response.dimensions.length !== FIT_INTENT_DIMENSIONS.length) {
+    throw new EvaluationContractError("Unsupported or incomplete Fit assembly");
+  }
+  const dimensions = response.dimensions.map((entry, index) => {
+    const row = object(entry, `dimensions[${index}]`);
+    exactKeys(row, ["dimension", "disposition", "inputAvailability", "completenessDomain", "completenessId", "profileCompleteness"], `dimensions[${index}]`);
+    const dimension = text(row.dimension, "dimension", 64);
+    const disposition = text(row.disposition, "disposition", 32);
+    const inputAvailability = text(row.inputAvailability, "inputAvailability", 32);
+    const completenessDomain = text(row.completenessDomain, "completenessDomain", 32);
+    const profileCompleteness = text(row.profileCompleteness, "profileCompleteness", 32);
+    if (!(FIT_INTENT_DIMENSIONS as readonly string[]).includes(dimension)
+      || !["DECLARED", "EXPLICIT_NOT_SUPPLIED"].includes(disposition)
+      || !["INCLUDED", "NOT_SUPPLIED"].includes(inputAvailability)
+      || !["GOALS", "PREFERENCES"].includes(completenessDomain)
+      || !["COMPLETE", "PARTIAL", "UNKNOWN"].includes(profileCompleteness)
+      || (disposition === "EXPLICIT_NOT_SUPPLIED") !== (inputAvailability === "NOT_SUPPLIED")) {
+      throw new EvaluationContractError("Fit assembly dimension is invalid");
+    }
+    return {
+      dimension: dimension as FitEvaluationAssembly["dimensions"][number]["dimension"],
+      disposition: disposition as FitEvaluationAssembly["dimensions"][number]["disposition"],
+      inputAvailability: inputAvailability as FitEvaluationAssembly["dimensions"][number]["inputAvailability"],
+      completenessDomain: completenessDomain as FitEvaluationAssembly["dimensions"][number]["completenessDomain"],
+      completenessId: uuid(row.completenessId, "completenessId"),
+      profileCompleteness: profileCompleteness as FitEvaluationAssembly["dimensions"][number]["profileCompleteness"],
+    };
+  });
+  if (new Set(dimensions.map((entry) => entry.dimension)).size !== FIT_INTENT_DIMENSIONS.length) {
+    throw new EvaluationContractError("Fit assembly dimensions must be unique");
+  }
+  const intentDocument = parseFitIntentDocument(response.intentDocument);
+  const result = {
+    schemaVersion: "FIT_EVALUATION_ASSEMBLY_V027" as const,
+    profileVersionId: uuid(response.profileVersionId, "profileVersionId"),
+    intentSetId: uuid(response.intentSetId, "intentSetId"),
+    programVersionId: uuid(response.programVersionId, "programVersionId"),
+    intentSnapshotHash: hash(response.intentSnapshotHash, "intentSnapshotHash"),
+    dimensions,
+    intentDocument,
+  };
+  if (result.profileVersionId !== intentDocument.profileVersionId
+    || result.intentSetId !== intentDocument.intentSetId
+    || result.intentSnapshotHash !== intentDocument.snapshotHash
+    || intentDocument.status !== "FROZEN") {
+    throw new EvaluationContractError("Fit assembly identity is inconsistent");
+  }
+  return result;
 }
 
 export type EligibilityRequirementSummary = Readonly<{
@@ -310,3 +330,4 @@ export function projectFitEdgeResult(value: unknown): FitConnectionResult {
     dimensions,
   };
 }
+import { FIT_INTENT_DIMENSIONS, parseFitIntentDocument, type FitIntentDocument } from "../intent/contracts";

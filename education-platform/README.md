@@ -23,18 +23,23 @@ supabase db reset
 The golden record is a data migration, so `db reset` installs both the schema
 and its verified data. `supabase/config.toml` deliberately disables a separate
 seed file. The active local migration directory contains migrations
-`001`–`024`; migrations `001`–`018` remain frozen. Additive Migration `019`
+`001`–`029`; migrations `001`–`018` remain frozen. Additive Migration `019`
 provides the local-only Profile draft/readiness/freeze backend capability, and
 Migration `020` adds the local-only Frozen Profile to new DRAFT fork. Migration
 `021` repairs hosted Auth subject extraction without expanding Auth ACLs, and
 Migration `022` adds the local-only owner-scoped Profile taxonomy label
 projection. Migration `023` adds local-only bounded ASSESSMENT/SKILL taxonomy
-options, and Migration `024` adds the local-only Assessment/Skill taxonomy
-admissibility core without seeding real assessment definitions. None of
-`019`–`024` has
-been deployed. The separately planned
-Application/Outcome contract has a provisional future Migration `027` identity and remains
-unimplemented pending separate implementation authorization.
+options, Migration `024` adds the local-only Assessment/Skill taxonomy
+admissibility core without seeding real assessment definitions, Migration
+`025` adds local-only frozen Profile discovery, Migration `026` adds local-only
+Eligibility production assembly, and Migration `027` adds the local-only Real
+Student Fit Intent capability. Migration `028` registers the separate
+product-aware Fit input/manifest compatibility build without changing Fit
+v0.1 semantics. Migration `029` adds only the transaction-bound M027 privacy-
+deletion compatibility repair. None of `019`–`029` has been deployed. The
+separately planned Application/Outcome contract has a provisional future
+Migration `030` identity and remains unimplemented pending separate
+implementation authorization.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
 executor membership grant path; PostgreSQL 16+ uses the authorized
@@ -332,11 +337,14 @@ data collection, or deployment, and it preserves Eligibility as rule logic and
 Fit as categorical preference/constraint semantics.
 
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 027 Application/Outcome SQL, Application/Outcome runtime, or Competitiveness model is
-implemented or authorized by those documents. Migration 026 is the local-only
-Eligibility Production Assembly implementation; Migration 027 remains the
-provisional Application/Outcome identity until separate implementation authorization.
+[docs/MIGRATION_030_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_030_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 030 Application/Outcome SQL, Application/Outcome runtime, or
+Competitiveness model is implemented or authorized by those documents.
+Migration 027 is the local-only Real Student Fit Intent capability;
+Migration 028 is the local-only Fit product manifest compatibility build
+registration; Migration 029 is the local-only M027 privacy-deletion
+compatibility repair; Migration 030 remains the provisional
+Application/Outcome identity until separate implementation authorization.
 The original Migration 020 plan disposition is preserved as historical
 provenance in
 [docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md](docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md).

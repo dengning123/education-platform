@@ -5,14 +5,55 @@ import {
   calculateReviewedFinancialNormalization,
   FitExecutorPostgrestGateway,
   FitSnapshotGateway,
+  fitEvaluationRequestFromProductAssembly,
+  parseProductFitEvaluationRequest,
+  parseProductFitIntentAssembly,
   parseFitEvaluationResumeRequest,
   parseFitEvaluationRequest,
   parseFitFinancialNormalizationDraftRequest,
   parseFitFinancialNormalizationReviewRequest,
+  loadProductFitEvaluationSnapshot,
   PostgrestGateway,
   postgresIn,
   requireOne,
 } from "../src/index.js";
+
+const productId = (suffix: string) => `00000000-0000-4000-8000-${suffix.padStart(12, "0")}`;
+
+function productAssembly() {
+  const dimensions = [
+    "ACADEMIC", "CAREER", "FINANCIAL", "GEOGRAPHIC_DELIVERY",
+    "PERSONAL_PREFERENCE", "INTERNATIONAL_ACCESSIBILITY",
+  ] as const;
+  return {
+    schemaVersion: "FIT_EVALUATION_ASSEMBLY_V027",
+    profileVersionId: productId("1"),
+    intentSetId: productId("2"),
+    programVersionId: productId("3"),
+    intentSnapshotHash: "a".repeat(64),
+    dimensions: dimensions.map((dimension, index) => ({
+      dimension,
+      disposition: "EXPLICIT_NOT_SUPPLIED",
+      inputAvailability: "NOT_SUPPLIED",
+      completenessDomain: ["ACADEMIC", "CAREER", "INTERNATIONAL_ACCESSIBILITY"].includes(dimension) ? "GOALS" : "PREFERENCES",
+      completenessId: productId(String(100 + index)),
+      profileCompleteness: "UNKNOWN",
+    })),
+    intentDocument: {
+      schemaVersion: "FIT_INTENT_DOCUMENT_V027",
+      intentSetId: productId("2"),
+      profileVersionId: productId("1"),
+      versionNumber: 1,
+      status: "FROZEN",
+      revision: 6,
+      snapshotHash: "a".repeat(64),
+      taxonomyRelease: { releaseCode: "v0.1", releaseOrdinal: 1 },
+      dimensions: dimensions.map((dimension) => ({ dimension, state: "EXPLICIT_NOT_SUPPLIED" })),
+      declarations: [],
+      accessContext: null,
+    },
+  };
+}
 
 const validRequest = {
   profileVersionId: "profile-1",
@@ -51,6 +92,68 @@ test("request boundary accepts only the closed production DTO", () => {
     }),
     /duplicates/,
   );
+});
+
+test("product request carries identities only and never accepts disposition or evidence authority", () => {
+  const request = {
+    schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027",
+    profileVersionId: productId("1"),
+    intentSetId: productId("2"),
+    programVersionId: productId("3"),
+    eligibilityContextEvaluationId: null,
+  };
+  assert.deepEqual(parseProductFitEvaluationRequest(request), request);
+  assert.throws(
+    () => parseProductFitEvaluationRequest({ ...request, disposition: "DECLARED" }),
+    /exact closed request contract/,
+  );
+  assert.throws(
+    () => parseProductFitEvaluationRequest({ ...request, evidence: {} }),
+    /exact closed request contract/,
+  );
+});
+
+test("authoritative M027 parser binds six explicit omissions to exact completeness witnesses", () => {
+  const parsed = parseProductFitIntentAssembly(productAssembly());
+  assert.equal(parsed.dimensions.length, 6);
+  for (const dimension of parsed.dimensions) {
+    assert.equal(dimension.disposition, "EXPLICIT_NOT_SUPPLIED");
+    assert.equal(dimension.inputAvailability, "NOT_SUPPLIED");
+    assert.match(dimension.completenessId, /^[0-9a-f-]{36}$/);
+  }
+  const request = fitEvaluationRequestFromProductAssembly({
+    schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027",
+    profileVersionId: productId("1"),
+    intentSetId: productId("2"),
+    programVersionId: productId("3"),
+    eligibilityContextEvaluationId: null,
+  }, parsed);
+  assert.deepEqual(request.evidence.taxonomyConceptIds, []);
+  assert.equal(request.evidence.accessContextId, null);
+  assert.equal(request.evidence.canonicalObservationIds.length, 0);
+  assert.equal(request.evidence.directFinancialComparisons.length, 0);
+});
+
+test("authoritative M027 parser rejects fake inclusion, arbitrary keys, and declaration/disposition conflict", () => {
+  const fakeIncluded = structuredClone(productAssembly());
+  fakeIncluded.dimensions[0]!.inputAvailability = "INCLUDED";
+  assert.throws(() => parseProductFitIntentAssembly(fakeIncluded), /semantic mapping/);
+
+  const arbitrary = structuredClone(productAssembly()) as ReturnType<typeof productAssembly> & { neutralIntent?: boolean };
+  arbitrary.neutralIntent = true;
+  assert.throws(() => parseProductFitIntentAssembly(arbitrary), /assembly keys/);
+
+  const fakeDeclaration = structuredClone(productAssembly());
+  fakeDeclaration.intentDocument.declarations.push({
+    declarationId: productId("900"),
+    dimension: "ACADEMIC",
+    semanticType: "TAXONOMY_TARGET",
+    importance: "NEUTRAL",
+    importanceConfirmedByStudent: true,
+    provenance: "SELF_ASSERTED",
+    typedValue: { conceptId: productId("901"), relation: "DESIRED" },
+  } as never);
+  assert.throws(() => parseProductFitIntentAssembly(fakeDeclaration), /disposition\/declaration consistency/);
 });
 
 test("request boundary permits at most one direct Financial source per intent", () => {
@@ -206,4 +309,42 @@ test("snapshot gateway exposes only bounded rows and closed filters", async () =
     { id: "b", status: "ACTIVE", retired_at: null },
   ]);
   assert.throws(() => gateway.select("unavailable"), /does not expose/);
+});
+
+test("product snapshot uses only the additive M028 bounded projection", async () => {
+  const calls: Array<{ url: string; body: unknown }> = [];
+  const fetchSnapshot: typeof fetch = async (input, init = {}) => {
+    calls.push({
+      url: String(input),
+      body: init.body === undefined ? null : JSON.parse(String(init.body)),
+    });
+    return new Response(JSON.stringify({ fit_evaluator_builds: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  const gateway = new PostgrestGateway("https://database.example", "service-key", "service-key", fetchSnapshot);
+  await loadProductFitEvaluationSnapshot(gateway, validRequest);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0]!.url, /\/rest\/v1\/rpc\/get_fit_product_evaluation_snapshot_v028$/);
+  assert.deepEqual(calls[0]!.body, {
+    p_profile_version_id: validRequest.profileVersionId,
+    p_intent_set_id: validRequest.intentSetId,
+    p_program_version_id: validRequest.programVersionId,
+    p_taxonomy_release_code: validRequest.taxonomyReleaseCode,
+    p_observation_ids: [],
+    p_catalog_mapping_ids: [],
+    p_student_course_ids: [],
+    p_student_mapping_ids: [],
+    p_taxonomy_concept_ids: [],
+    p_context_claim_ids: [],
+    p_context_mapping_ids: [],
+  });
+  assert.throws(
+    () => loadProductFitEvaluationSnapshot(gateway, {
+      ...validRequest,
+      evidence: { ...validRequest.evidence, approvedFinancialNormalizationIds: ["normalization-1"] },
+    }),
+    /cannot start from a reviewed Financial normalization/,
+  );
 });

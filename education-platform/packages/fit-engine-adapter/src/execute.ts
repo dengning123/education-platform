@@ -5,13 +5,15 @@ import {
   type FitEvaluationOutput,
 } from "@education-platform/fit-engine";
 import { FitAdapterError, type FitDatabaseGateway, requireOne } from "./database-gateway.js";
-import { resolveFitEvaluationInput } from "./input-resolver.js";
+import { resolveFitEvaluationInput, resolveProductFitEvaluationInput } from "./input-resolver.js";
 import { persistFitEvaluation } from "./persistence.js";
+import type { ProductFitIntentAssembly } from "./product-intent-assembly.js";
 import { resolveFitContract } from "./registry-resolver.js";
 import type { FitEvaluationRequest } from "./request.js";
 
 export const PRODUCTION_EVALUATOR_NAME = "education-platform-fit-engine";
 export const PRODUCTION_EVALUATOR_VERSION = "0.1.0";
+export const PRODUCT_EVALUATOR_VERSION = "0.1.0-product-v027";
 
 type EvaluationRow = { evaluation_id: string; evaluation_as_of: string; evaluation_state: string };
 
@@ -22,17 +24,19 @@ export type ExecutedFitEvaluation = Readonly<{
   output: FitEvaluationOutput;
 }>;
 
-export async function executeFitEvaluation(
+async function executeWithResolvedInput(
   database: FitDatabaseGateway,
   request: FitEvaluationRequest,
-  sourceDatabase: FitDatabaseGateway = database,
+  sourceDatabase: FitDatabaseGateway,
+  evaluatorVersion: string,
+  inputResolver: (contract: Awaited<ReturnType<typeof resolveFitContract>>, evaluationAsOf: string) => ReturnType<typeof resolveFitEvaluationInput>,
 ): Promise<ExecutedFitEvaluation> {
   if (request.evidence.approvedFinancialNormalizationIds.length !== 0) {
     throw new FitAdapterError("Reviewed Financial normalizations must resume their existing BUILDING evaluation", 400);
   }
   const contract = await resolveFitContract(sourceDatabase, {
     evaluatorName: PRODUCTION_EVALUATOR_NAME,
-    evaluatorVersion: PRODUCTION_EVALUATOR_VERSION,
+    evaluatorVersion,
   });
   const evaluationId = await database.rpc<string>("start_fit_evaluation", {
     p_profile_version_id: request.profileVersionId,
@@ -50,12 +54,7 @@ export async function executeFitEvaluation(
       evaluation_id: `eq.${evaluationId}`,
     }), "started Fit evaluation");
     if (evaluation.evaluation_state !== "BUILDING") throw new FitAdapterError("New Fit evaluation is not BUILDING", 409);
-    const input = canonicalizeFitEvaluationInput(await resolveFitEvaluationInput(
-      sourceDatabase,
-      contract,
-      request,
-      evaluation.evaluation_as_of,
-    ));
+    const input = canonicalizeFitEvaluationInput(await inputResolver(contract, evaluation.evaluation_as_of));
     const output = evaluateFit(input);
     canonicalFitOutputJson(output);
     const fingerprints = await persistFitEvaluation(database, evaluationId, input, output);
@@ -69,4 +68,33 @@ export async function executeFitEvaluation(
       cause: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+export function executeFitEvaluation(
+  database: FitDatabaseGateway,
+  request: FitEvaluationRequest,
+  sourceDatabase: FitDatabaseGateway = database,
+): Promise<ExecutedFitEvaluation> {
+  return executeWithResolvedInput(
+    database,
+    request,
+    sourceDatabase,
+    PRODUCTION_EVALUATOR_VERSION,
+    (contract, evaluationAsOf) => resolveFitEvaluationInput(sourceDatabase, contract, request, evaluationAsOf),
+  );
+}
+
+export function executeProductFitEvaluation(
+  database: FitDatabaseGateway,
+  request: FitEvaluationRequest,
+  productAssembly: ProductFitIntentAssembly,
+  sourceDatabase: FitDatabaseGateway = database,
+): Promise<ExecutedFitEvaluation> {
+  return executeWithResolvedInput(
+    database,
+    request,
+    sourceDatabase,
+    PRODUCT_EVALUATOR_VERSION,
+    (contract, evaluationAsOf) => resolveProductFitEvaluationInput(sourceDatabase, contract, request, evaluationAsOf, productAssembly),
+  );
 }

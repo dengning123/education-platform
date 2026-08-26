@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   FIT_DIMENSIONS,
+  parseFitEvaluationAssembly,
   parseEligibilityConnectionRequest,
   parseFitConnectionRequest,
   projectFitEdgeResult,
@@ -12,13 +13,18 @@ const id = (suffix: string) => `00000000-0000-4000-8000-${suffix.padStart(12, "0
 
 function fitRequest() {
   return {
-    profileVersionId: id("1"), intentSetId: id("2"), programVersionId: id("3"), taxonomyReleaseCode: "v0.1",
-    supersedesEvaluationId: null, eligibilityContextEvaluationId: null,
-    evidence: {
-      canonicalObservationIds: [], catalogMappingIds: [], studentCourseIds: [], studentMappingIds: [],
-      taxonomyConceptIds: [], contextClaimIds: [], contextMappingIds: [], accessContextId: null,
-      directFinancialComparisons: [], approvedFinancialNormalizationIds: [],
-    },
+    profileVersionId: id("1"), intentSetId: id("2"), programVersionId: id("3"),
+    completedEligibilityEvaluationId: null, operationId: id("5"),
+  };
+}
+
+function intentDocument() {
+  return {
+    schemaVersion: "FIT_INTENT_DOCUMENT_V027", intentSetId: id("2"), profileVersionId: id("1"),
+    versionNumber: 1, status: "FROZEN", revision: 7, snapshotHash: "c".repeat(64),
+    taxonomyRelease: { releaseCode: "v0.1", releaseOrdinal: 1 },
+    dimensions: FIT_DIMENSIONS.map((dimension) => ({ dimension, state: "EXPLICIT_NOT_SUPPLIED" })),
+    declarations: [], accessContext: null,
   };
 }
 
@@ -63,10 +69,34 @@ describe("closed evaluation contracts", () => {
     }).programVersionId).toBe("00000000-0000-0000-0000-000000000401");
   });
 
-  it("keeps the Fit proxy request in exact parity with the existing Edge request", () => {
+  it("accepts only the high-level product Fit identities", () => {
     expect(parseFitConnectionRequest(fitRequest())).toEqual(fitRequest());
     expect(() => parseFitConnectionRequest({ ...fitRequest(), studentId: id("8") })).toThrow(/exact closed contract/);
-    expect(() => parseFitConnectionRequest({ ...fitRequest(), evidence: { ...fitRequest().evidence, arbitrary: [] } })).toThrow();
+    for (const forbidden of ["taxonomyReleaseCode", "supersedesEvaluationId", "evidence", "accessContextId", "canonicalObservationIds"]) {
+      expect(() => parseFitConnectionRequest({ ...fitRequest(), [forbidden]: forbidden === "evidence" ? {} : id("9") })).toThrow(/exact closed contract/);
+    }
+    expect(() => parseFitConnectionRequest({ ...fitRequest(), completedEligibilityEvaluationId: undefined })).toThrow();
+    const withoutEligibility = {
+      profileVersionId: id("1"), intentSetId: id("2"), programVersionId: id("3"), operationId: id("5"),
+    };
+    expect(parseFitConnectionRequest(withoutEligibility).completedEligibilityEvaluationId).toBeNull();
+  });
+
+  it("accepts only a frozen, identity-consistent M027 Fit assembly", () => {
+    const raw = {
+      schemaVersion: "FIT_EVALUATION_ASSEMBLY_V027", profileVersionId: id("1"), intentSetId: id("2"),
+      programVersionId: id("3"), intentSnapshotHash: "c".repeat(64), intentDocument: intentDocument(),
+      dimensions: FIT_DIMENSIONS.map((dimension) => ({
+        dimension, disposition: "EXPLICIT_NOT_SUPPLIED", inputAvailability: "NOT_SUPPLIED",
+        completenessDomain: ["ACADEMIC", "CAREER", "INTERNATIONAL_ACCESSIBILITY"].includes(dimension) ? "GOALS" : "PREFERENCES",
+        completenessId: id(String(100 + FIT_DIMENSIONS.indexOf(dimension))), profileCompleteness: "UNKNOWN",
+      })),
+    };
+    expect(parseFitEvaluationAssembly(raw).intentSetId).toBe(id("2"));
+    expect(() => parseFitEvaluationAssembly({ ...raw, intentSnapshotHash: "d".repeat(64) })).toThrow(/identity is inconsistent/);
+    const aliased = structuredClone(raw);
+    aliased.dimensions[1].dimension = aliased.dimensions[0].dimension;
+    expect(() => parseFitEvaluationAssembly(aliased)).toThrow(/unique/);
   });
 
   it("accepts only the database-authored closed Eligibility projection", () => {

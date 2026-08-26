@@ -27,6 +27,14 @@ export type FitEvaluationRequest = Readonly<{
   }>;
 }>;
 
+export type ProductFitEvaluationRequest = Readonly<{
+  schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027";
+  profileVersionId: string;
+  intentSetId: string;
+  programVersionId: string;
+  eligibilityContextEvaluationId: string | null;
+}>;
+
 export type FitFinancialNormalizationDraftRequest = Readonly<{
   evaluation: FitEvaluationRequest;
   draft: Readonly<{
@@ -92,6 +100,26 @@ function exactDecimal(value: unknown, label: string): string {
     throw new FitAdapterError(`${label} must be a positive exact decimal string`, 400);
   }
   return result;
+}
+
+export function isProductFitEvaluationRequest(value: unknown): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && (value as Record<string, unknown>).schemaVersion === "FIT_PRODUCT_EVALUATION_REQUEST_V027";
+}
+
+export function parseProductFitEvaluationRequest(value: unknown): ProductFitEvaluationRequest {
+  const request = object(value, "request");
+  exactKeys(request, ["schemaVersion", "profileVersionId", "intentSetId", "programVersionId", "eligibilityContextEvaluationId"], "request");
+  if (request.schemaVersion !== "FIT_PRODUCT_EVALUATION_REQUEST_V027") {
+    throw new FitAdapterError("Unsupported product Fit request schema", 400);
+  }
+  return {
+    schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027",
+    profileVersionId: text(request.profileVersionId, "profileVersionId"),
+    intentSetId: text(request.intentSetId, "intentSetId"),
+    programVersionId: text(request.programVersionId, "programVersionId"),
+    eligibilityContextEvaluationId: nullableText(request.eligibilityContextEvaluationId, "eligibilityContextEvaluationId"),
+  };
 }
 
 export function parseFitEvaluationRequest(value: unknown): FitEvaluationRequest {

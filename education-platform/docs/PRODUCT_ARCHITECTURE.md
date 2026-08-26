@@ -443,11 +443,15 @@ Ranking, probability, recommendation, and Competitiveness remain unimplemented.
 The forward product milestone remains the Phase 4 minimum authenticated loop;
 see
 [`PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md`](PHASE_4_PRODUCTION_OBSERVABILITY_AND_MVP_PLAN.md).
-The separately bounded provisional Migration 027 Application/Outcome proposal is recorded
+The separately bounded provisional Migration 030 Application/Outcome proposal is recorded
 in
-[`MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+[`MIGRATION_030_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_030_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
 Its migration number remains provisional until implementation authorization.
-No Migration 027 Application/Outcome SQL or Competitiveness implementation exists. Migration 021
+No Migration 030 Application/Outcome SQL or Competitiveness implementation
+exists. Migration 028 is limited to the separately versioned product-aware Fit
+input/manifest compatibility build registration, and Migration 029 only makes
+the M027 product guard compatible with the existing transaction-bound privacy
+deletion lifecycle. Neither changes Fit v0.1 semantic law. Migration 021
 is limited to hosted Auth subject compatibility, Migration 022 is limited to
 the owner-scoped Profile taxonomy label projection, and Migration 023 is
 limited to bounded ASSESSMENT/SKILL taxonomy options. Migration 024's current

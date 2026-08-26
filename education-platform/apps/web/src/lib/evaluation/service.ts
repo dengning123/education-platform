@@ -25,14 +25,7 @@ export type EvaluationAuthClient = {
     getUser(): Promise<Readonly<{ data: Readonly<{ user: unknown | null }>; error: unknown }>>;
     getSession(): Promise<Readonly<{ data: Readonly<{ session: Readonly<{ access_token: string }> | null }>; error: unknown }>>;
   };
-  rpc(
-    functionName: "assemble_eligibility_evaluation_v026",
-    args: Readonly<{
-      p_profile_version_id: string;
-      p_program_version_id: string;
-      p_operation_id: string;
-    }>,
-  ): PromiseLike<Readonly<{ data: unknown; error: unknown }>>;
+  rpc(functionName: string, args: Record<string, unknown>): PromiseLike<Readonly<{ data: unknown; error: unknown }>>;
 };
 
 const DEPENDENCY_DEADLINE_MS = 45_000;
@@ -117,6 +110,14 @@ export class SupabaseEvaluationService implements EvaluationService {
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     if (!baseUrl || !publicKey) throw new EvaluationServiceError("INTERNAL_ERROR");
+    const edgeRequest = {
+      schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027",
+      profileVersionId: input.profileVersionId,
+      intentSetId: input.intentSetId,
+      programVersionId: input.programVersionId,
+      eligibilityContextEvaluationId: input.completedEligibilityEvaluationId,
+    };
+
     let response: Response;
     try {
       response = await this.dependencyFetch(new URL("/functions/v1/fit-evaluate", baseUrl), {
@@ -126,7 +127,7 @@ export class SupabaseEvaluationService implements EvaluationService {
           authorization: `Bearer ${this.token()}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify(input),
+        body: JSON.stringify(edgeRequest),
       });
     } catch {
       throw new EvaluationServiceError("REQUEST_TIMEOUT");

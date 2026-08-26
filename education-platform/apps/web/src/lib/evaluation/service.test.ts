@@ -10,12 +10,8 @@ import { SupabaseEvaluationService, type EvaluationAuthClient } from "./service"
 const id = (suffix: string) => `00000000-0000-4000-8000-${suffix.padStart(12, "0")}`;
 
 const fitRequest: FitConnectionRequest = {
-  profileVersionId: id("1"), intentSetId: id("2"), programVersionId: id("3"), taxonomyReleaseCode: "v0.1",
-  supersedesEvaluationId: null, eligibilityContextEvaluationId: id("4"),
-  evidence: {
-    canonicalObservationIds: [], catalogMappingIds: [], studentCourseIds: [], studentMappingIds: [], taxonomyConceptIds: [],
-    contextClaimIds: [], contextMappingIds: [], accessContextId: null, directFinancialComparisons: [], approvedFinancialNormalizationIds: [],
-  },
+  profileVersionId: id("1"), intentSetId: id("2"), programVersionId: id("3"),
+  completedEligibilityEvaluationId: id("4"), operationId: id("30"),
 };
 
 function fitBody() {
@@ -90,7 +86,7 @@ describe("Fit same-origin secure proxy service", () => {
     })).rejects.toEqual(new EvaluationServiceError("INTERNAL_ERROR"));
   });
 
-  it("propagates only the current session JWT to the existing Fit Edge and projects a closed result", async () => {
+  it("sends only high-level Fit identities and the current session JWT to the product-aware Edge", async () => {
     const dependencyFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       void input;
       void init;
@@ -105,7 +101,12 @@ describe("Fit same-origin secure proxy service", () => {
     const [url, init] = dependencyFetch.mock.calls[0];
     expect(String(url)).toContain("/functions/v1/fit-evaluate");
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer alice-session-jwt");
-    expect(init?.body).toBe(JSON.stringify(fitRequest));
+    expect(JSON.parse(String(init?.body))).toEqual({
+      schemaVersion: "FIT_PRODUCT_EVALUATION_REQUEST_V027",
+      profileVersionId: id("1"), intentSetId: id("2"), programVersionId: id("3"),
+      eligibilityContextEvaluationId: id("4"),
+    });
+    expect(String(init?.body)).not.toContain(id("30"));
     expect(JSON.stringify(result)).not.toContain("alice-session-jwt");
   });
 

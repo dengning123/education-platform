@@ -79,26 +79,35 @@ service. Its order is:
 
 1. light read-only disk preflight;
 2. layered tooling unit/security tests;
-3. targeted existing Profile command/DTO/source/semantic/no-AI tests;
-4. `git diff --check`.
+3. targeted M027 Intent/M028 Fit compatibility orchestration and security tests;
+4. targeted existing Profile command/DTO/source/semantic/no-AI tests;
+5. `git diff --check`.
 
 The Profile package test requires dependencies installed from the committed
 lockfile. Failure does not cause fallback to a smaller test.
 
 ## RELEVANT
 
-Manifest v1 binds `RELEVANT` to the currently reviewed Migration 026
-Eligibility production-assembly increment. It is intentionally conservative:
+Manifest v1 binds `RELEVANT` to the currently reviewed Migration 029
+privacy-deletion compatibility repair over the M027 Intent graph and the M028
+product Fit build. It is intentionally conservative:
 
 1. heavy read-only disk/Docker preflight;
-2. clean PostgreSQL 17 non-superuser `001→026` runner path;
-3. Phase 026 assembly/security/idempotency/privacy SQL;
-4. populated `025→026` upgrade;
-5. actual local `supabase db reset --local` path;
-6. Phase 026 Auth-issued JWT/PostgREST concurrent assembly E2E;
-7. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
-8. targeted Profile and evaluation command/DTO/source/semantic/no-AI tests;
-9. `git diff --check`.
+2. clean PostgreSQL 17 non-superuser `001→029` runner path;
+3. Phase 027 lifecycle/assembly/security/idempotency/privacy SQL;
+4. Phase 028 evaluator-build registration/ACL SQL;
+5. Phase 029 authorized-cascade/direct-role/spoof/rollback/privacy SQL;
+6. populated `027→028` legacy/completed-evaluation preservation proof;
+7. populated `028→029` M027 graph preservation and privacy closure proof;
+8. Phase 029 deletion-versus-mutate/freeze/evaluation concurrency proof;
+9. actual local `supabase db reset --local` path;
+10. Phase 027 Auth-issued JWT/PostgREST lifecycle and assembly E2E;
+11. frozen Fit Engine categorical regression;
+12. product-aware adapter/parser and legacy parity regression;
+13. real local Browser → Next → Auth → Edge → PostgREST → PostgreSQL product flow;
+14. targeted M027 Intent/M028 Fit command, DTO, and source-boundary tests;
+15. product-aware runtime reproducibility;
+16. `git diff --check`.
 
 A future bounded increment needs a reviewed manifest version to change this
 mapping. The runner never infers relevance from changed paths and accepts no
@@ -109,37 +118,48 @@ caller-supplied test file or command.
 `BASELINE` preserves the current complete local final-proof categories:
 
 1. heavy read-only preflight;
-2. PostgreSQL 15 non-superuser clean `001→026`;
-3. PostgreSQL 17 non-superuser clean `001→026`;
-4. version-boundary ordered SQL suites `001–018`;
+2. PostgreSQL 15 non-superuser clean `001→029`;
+3. PostgreSQL 17 non-superuser clean `001→029`;
+4. version-boundary ordered SQL suites `001–021`;
 5. populated `023→024` upgrade;
 6. populated `024→025` upgrade;
 7. populated `025→026` upgrade;
-8. actual local Supabase reset;
-9. Phase 024 behavior/security/privacy;
-10. Phase 025 discovery/security/privacy;
-11. Phase 026 assembly/security/idempotency/privacy;
-12. Phase 024 definition concurrency;
-13. Phase 020 Profile fork concurrency;
-14. Phase 021–025 real local Auth/PostgREST matrix;
-15. Phase 026 real local Auth/PostgREST concurrent assembly matrix;
-16. exact local Auth restart followed by Phase 026 E2E;
-17. Eligibility full suite;
-18. Fit Engine full suite;
-19. production adapter full suite;
-20. frozen Edge HTTP boundary suite;
-21. Minimum Beta Operations checker/query-pack tests;
-22. Web unit/contract/security suite;
-23. full fake browser/auth/Profile/accessibility/mobile suite;
-24. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
-25. lint;
-26. TypeScript;
-27. Next.js production build;
-28. client-secret/test-fixture source boundary;
-29. semantic/no-AI executable guards;
-30. frozen Fit runtime rebuild/reproducibility;
-31. frozen Migration 001–025/semantic/Edge/evaluator/fingerprint/runtime audit;
-32. final `git diff --check`.
+8. populated `026→027` upgrade;
+9. populated `027→028` legacy/completed-evaluation preservation proof;
+10. populated `028→029` M027 graph preservation and privacy closure proof;
+11. actual local Supabase reset;
+12. Phase 024 behavior/security/privacy;
+13. Phase 025 discovery/security/privacy;
+14. Phase 026 assembly/security/idempotency/privacy;
+15. Phase 027 lifecycle/assembly/security/idempotency/privacy;
+16. Phase 028 evaluator-build registration/ACL proof;
+17. Phase 029 authorized-cascade/direct-role/spoof/rollback/privacy proof;
+18. Phase 024 definition concurrency;
+19. Phase 020 Profile fork concurrency;
+20. Phase 027 lifecycle concurrency;
+21. Phase 029 deletion concurrency and no-resurrection proof;
+22. Phase 021–025 real local Auth/PostgREST matrix;
+23. Phase 026 real local Auth/PostgREST concurrent assembly matrix;
+24. exact local Auth restart followed by Phase 026 E2E;
+25. Phase 027 real local Auth/PostgREST lifecycle and assembly matrix;
+26. exact local Auth restart followed by Phase 027 E2E;
+27. Eligibility full suite;
+28. Fit Engine full suite;
+29. production adapter full suite;
+30. frozen Edge HTTP boundary suite;
+31. Minimum Beta Operations checker/query-pack tests;
+32. Web unit/contract/security suite;
+33. full fake browser/auth/Profile/accessibility/mobile suite;
+34. real local Browser → Next → Auth → Edge → PostgREST → PostgreSQL lifecycle;
+35. targeted M027 Intent/M028 Fit compatibility orchestration contract suite;
+36. lint;
+37. TypeScript;
+38. Next.js production build;
+39. client-secret/test-fixture source boundary;
+40. semantic/no-AI executable guards;
+41. product-aware Fit runtime rebuild/reproducibility;
+42. frozen Migration 001–027/semantic/Financial-Edge/fingerprint/runtime audit;
+43. final `git diff --check`.
 
 The ordered SQL command applies and tests frozen versions at their documented
 boundaries; it does not incorrectly run old negative-leakage tests only after
@@ -233,8 +253,9 @@ startup. It is not a reduction in final test count or assurance.
 
 ## Limitations
 
-- Manifest v1's `RELEVANT` mapping is specific to the current Profile
-  lifecycle-closure capability; it is not a general changed-path selector.
+- Manifest v1's `RELEVANT` mapping is specific to the current M029 M027-privacy
+  compatibility repair over the M028 product Fit build; it is not a general
+  changed-path selector.
 - Package and Playwright dependencies must be installed before package/browser
   commands run. The runner does not change package versions or lockfiles.
 - Required PostgreSQL/Supabase/Docker images must already be available; the

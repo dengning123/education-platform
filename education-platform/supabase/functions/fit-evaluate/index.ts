@@ -6,9 +6,15 @@ import {
 } from "../_shared/http-boundary.js";
 import {
   executeFitEvaluation,
+  executeProductFitEvaluation,
+  fitEvaluationRequestFromProductAssembly,
   FitExecutorPostgrestGateway,
   FitAdapterError,
+  isProductFitEvaluationRequest,
   loadFitEvaluationSnapshot,
+  loadProductFitEvaluationSnapshot,
+  parseProductFitEvaluationRequest,
+  parseProductFitIntentAssembly,
   parseFitEvaluationRequest,
   PostgrestGateway,
 } from "../_shared/fit-runtime.js";
@@ -30,7 +36,10 @@ const handleRequest = createEdgeHttpHandler({
     }
 
     try {
-      const fitRequest = parseFitEvaluationRequest(body);
+      const productRequest = isProductFitEvaluationRequest(body)
+        ? parseProductFitEvaluationRequest(body)
+        : null;
+      let fitRequest = productRequest === null ? parseFitEvaluationRequest(body) : null;
       const userDatabase = new PostgrestGateway(
         supabaseUrl,
         anonKey,
@@ -38,17 +47,31 @@ const handleRequest = createEdgeHttpHandler({
         dependencyFetch,
       );
       const ownsProfile = await userDatabase.rpc<boolean>("current_user_owns_profile", {
-        p_profile_version_id: fitRequest.profileVersionId,
+        p_profile_version_id: productRequest?.profileVersionId ?? fitRequest!.profileVersionId,
       });
       if (ownsProfile !== true) throw edgeHttpError("PROFILE_NOT_FOUND");
+      const productAssembly = productRequest === null ? null : parseProductFitIntentAssembly(
+        await userDatabase.rpc<unknown>("get_fit_evaluation_assembly_v027", {
+          p_profile_version_id: productRequest.profileVersionId,
+          p_intent_set_id: productRequest.intentSetId,
+          p_program_version_id: productRequest.programVersionId,
+        }),
+      );
+      if (productRequest !== null && productAssembly !== null) {
+        fitRequest = fitEvaluationRequestFromProductAssembly(productRequest, productAssembly);
+      }
       const serviceDatabase = new FitExecutorPostgrestGateway(
         supabaseUrl,
         serviceRoleKey,
         serviceRoleKey,
         dependencyFetch,
       );
-      const sourceDatabase = await loadFitEvaluationSnapshot(serviceDatabase, fitRequest);
-      const executed = await executeFitEvaluation(serviceDatabase, fitRequest, sourceDatabase);
+      const sourceDatabase = productAssembly === null
+        ? await loadFitEvaluationSnapshot(serviceDatabase, fitRequest!)
+        : await loadProductFitEvaluationSnapshot(serviceDatabase, fitRequest!);
+      const executed = productAssembly === null
+        ? await executeFitEvaluation(serviceDatabase, fitRequest!, sourceDatabase)
+        : await executeProductFitEvaluation(serviceDatabase, fitRequest!, productAssembly, sourceDatabase);
       return jsonSuccess({
         evaluationId: executed.evaluationId,
         candidateInputFingerprint: executed.candidateInputFingerprint,

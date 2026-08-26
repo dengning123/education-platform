@@ -14,6 +14,7 @@ import {
 } from "@education-platform/fit-engine";
 import { FitAdapterError, postgresIn, requireOne, type FitDatabaseGateway } from "./database-gateway.js";
 import { calculateReviewedFinancialNormalization, equalExactDecimals } from "./financial-normalization.js";
+import type { ProductFitIntentAssembly } from "./product-intent-assembly.js";
 import type { DirectFinancialSelection, FitEvaluationRequest } from "./request.js";
 
 type ProfileRow = { profile_version_id: string; snapshot_hash: string | null; status: string };
@@ -30,6 +31,8 @@ type IntentRow = {
   importance_confirmed_by_student: boolean;
   source_student_goal_id: string | null;
   source_student_preference_id: string | null;
+  student_assertion_id: string | null;
+  interpretation_provenance: string;
 };
 type GoalRow = { student_goal_id: string; profile_version_id: string; goal_type: string; concept_id: string | null; goal_text: string | null };
 type PreferenceRow = { student_preference_id: string; profile_version_id: string; preference_type: string; value: unknown };
@@ -260,11 +263,12 @@ function directComparable(
   return comparable;
 }
 
-export async function resolveFitEvaluationInput(
+async function resolveFitEvaluationInputInternal(
   database: FitDatabaseGateway,
   contract: ResolvedFitContract,
   request: FitEvaluationRequest,
   evaluationAsOf: string,
+  productAssembly: ProductFitIntentAssembly | null,
 ): Promise<FitEvaluationInput> {
   const [profile, intentSet] = await Promise.all([
     database.select<ProfileRow>("student_profile_versions", { select: "profile_version_id,snapshot_hash,status", profile_version_id: `eq.${request.profileVersionId}` }).then((rows) => requireOne(rows, "profile version")),
@@ -275,6 +279,53 @@ export async function resolveFitEvaluationInput(
   }
   const intents = await database.select<IntentRow>("fit_intent_declarations", { select: "*", intent_set_id: `eq.${request.intentSetId}`, order: "dimension,intent_declaration_id" });
   const manifest: DecisionManifestItem[] = [];
+  const completenessKeyByDimension = new Map<FitDimension, string>();
+  if (productAssembly !== null) {
+    if (productAssembly.profileVersionId !== request.profileVersionId
+      || productAssembly.intentSetId !== request.intentSetId
+      || productAssembly.programVersionId !== request.programVersionId
+      || productAssembly.taxonomyReleaseCode !== request.taxonomyReleaseCode
+      || productAssembly.intentSnapshotHash !== intentSet.snapshot_hash) {
+      throw new FitAdapterError("Product Fit assembly identity does not match the frozen evaluation request", 409);
+    }
+    const assemblyDeclarations = new Map(productAssembly.declarations.map((row) => [row.declarationId, row]));
+    if (assemblyDeclarations.size !== intents.length || intents.some((row) => {
+      const declared = assemblyDeclarations.get(row.intent_declaration_id);
+      return declared === undefined || declared.dimension !== row.dimension || declared.semanticType !== row.semantic_type
+        || row.student_assertion_id === null || row.interpretation_provenance !== "SELF_ASSERTED";
+    })) {
+      throw new FitAdapterError("Product Fit assembly declarations do not match the frozen intent snapshot", 409);
+    }
+    for (const dimension of FIT_DIMENSIONS) {
+      const state = requireOne(productAssembly.dimensions.filter((row) => row.dimension === dimension), `${dimension} product disposition`);
+      const declarationCount = intents.filter((row) => row.dimension === dimension).length;
+      if ((state.disposition === "DECLARED") !== (declarationCount > 0)) {
+        throw new FitAdapterError(`${dimension} product disposition conflicts with frozen declarations`, 409);
+      }
+      const method = methodFor(contract, dimension);
+      const policy = policyFor(method, "STUDENT_COMPLETENESS");
+      const key = `completeness:${method.identity.id}:${state.completenessId}`;
+      completenessKeyByDimension.set(dimension, key);
+      manifest.push({
+        kind: "PHASE2_COMPLETENESS",
+        ref: ref(
+          method,
+          policy,
+          key,
+          state.completenessId,
+          dimension === "ACADEMIC"
+            ? "STUDENT_RAW_ACADEMIC_HISTORY"
+            : dimension === "INTERNATIONAL_ACCESSIBILITY"
+              ? "STUDENT_RAW_ACCESS_CONTEXT"
+              : "STUDENT_RAW_INTENT",
+          "LIMITING_CONTEXT",
+        ),
+        educationContextId: null,
+        domain: state.completenessDomain,
+        completeness: state.profileCompleteness,
+      });
+    }
+  }
   const intentById = new Map<string, FitIntent>();
   for (const row of intents) {
     const method = methodFor(contract, row.dimension);
@@ -556,7 +607,13 @@ export async function resolveFitEvaluationInput(
     if (methodManifest.length === 0) throw new FitAdapterError(`${dimension} has no exact intent or provenance manifest`, 422);
     return method.inputPolicies.filter((policy) => policy.disposition === "ALLOWED").map((policy) => {
       const keys = methodManifest.filter((item) => item.ref.inputPolicyRegistryId === policy.identity.id).map((item) => item.ref.manifestItemKey);
-      const included = keys.length > 0;
+      const productDimension = productAssembly?.dimensions.find((row) => row.dimension === dimension);
+      const productIntentPolicy = productDimension !== undefined && policy.inputDomain === "FIT_INTENTS";
+      const included = productIntentPolicy ? productDimension.disposition === "DECLARED" : keys.length > 0;
+      if (productIntentPolicy && ((included && keys.length === 0) || (!included && keys.length !== 0))) {
+        throw new FitAdapterError(`${dimension} FIT_INTENTS state conflicts with authoritative M027 disposition`, 409);
+      }
+      const completenessKey = completenessKeyByDimension.get(dimension) ?? null;
       return {
         methodRegistryId: method.identity.id,
         inputPolicyRegistryId: policy.identity.id,
@@ -564,9 +621,9 @@ export async function resolveFitEvaluationInput(
         policyKey: policy.policyKey as FitInputPolicyKey,
         requirement: policy.requirement,
         availability: included ? "INCLUDED" as const : "NOT_SUPPLIED" as const,
-        manifestItemKeys: keys,
+        manifestItemKeys: included ? keys : [],
         completenessManifestItemKey: null,
-        provenanceManifestItemKey: included ? null : methodManifest[0]!.ref.manifestItemKey,
+        provenanceManifestItemKey: included ? null : completenessKey ?? methodManifest[0]!.ref.manifestItemKey,
       };
     });
   });
@@ -592,4 +649,23 @@ export async function resolveFitEvaluationInput(
     manifest,
     inputStates,
   };
+}
+
+export function resolveFitEvaluationInput(
+  database: FitDatabaseGateway,
+  contract: ResolvedFitContract,
+  request: FitEvaluationRequest,
+  evaluationAsOf: string,
+): Promise<FitEvaluationInput> {
+  return resolveFitEvaluationInputInternal(database, contract, request, evaluationAsOf, null);
+}
+
+export function resolveProductFitEvaluationInput(
+  database: FitDatabaseGateway,
+  contract: ResolvedFitContract,
+  request: FitEvaluationRequest,
+  evaluationAsOf: string,
+  productAssembly: ProductFitIntentAssembly,
+): Promise<FitEvaluationInput> {
+  return resolveFitEvaluationInputInternal(database, contract, request, evaluationAsOf, productAssembly);
 }
