@@ -33,7 +33,7 @@ options, and Migration `024` adds the local-only Assessment/Skill taxonomy
 admissibility core without seeding real assessment definitions. None of
 `019`–`024` has
 been deployed. The separately planned
-Application/Outcome contract has a provisional future Migration `026` identity and remains
+Application/Outcome contract has a provisional future Migration `027` identity and remains
 unimplemented pending separate implementation authorization.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
@@ -332,10 +332,11 @@ data collection, or deployment, and it preserves Eligibility as rule logic and
 Fit as categorical preference/constraint semantics.
 
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_026_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_026_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 026 SQL, Application/Outcome runtime, or Competitiveness model is
-implemented or authorized by those documents. The 025 number remains
-provisional until implementation authorization.
+[docs/MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 027 Application/Outcome SQL, Application/Outcome runtime, or Competitiveness model is
+implemented or authorized by those documents. Migration 026 is the local-only
+Eligibility Production Assembly implementation; Migration 027 remains the
+provisional Application/Outcome identity until separate implementation authorization.
 The original Migration 020 plan disposition is preserved as historical
 provenance in
 [docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md](docs/PHASE_4_AND_MIGRATION_020_PLAN_REVIEW.md).

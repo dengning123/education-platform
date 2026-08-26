@@ -38,7 +38,10 @@ describe("frontend source boundary", () => {
     const files = await sourceFiles(sourceRoot);
     for (const file of files) {
       const content = await readFile(file, "utf8");
-      expect(content, relative(root, file)).not.toMatch(/\/(?:rest|functions)\/v1\//);
+      if (/\/(?:rest|functions)\/v1\//.test(content)) {
+        expect(relative(root, file)).toBe("src/lib/evaluation/service.ts");
+        expect(content).toMatch(/^import "server-only";/);
+      }
       expect(content, relative(root, file)).not.toMatch(/\.from\s*\(/);
     }
   });
@@ -55,9 +58,10 @@ describe("frontend source boundary", () => {
     expect(service).not.toMatch(/service.?role|management.?token|database.?password/i);
   });
 
-  it("adds only the approved Profile capability route and no privileged adapter", async () => {
+  it("adds only the approved Profile and evaluation capability routes", async () => {
     const files = (await sourceFiles(sourceRoot)).map((file) => relative(root, file));
-    expect(files.filter((file) => file.startsWith("src/app/api/"))).toEqual([
+    expect(files.filter((file) => file.startsWith("src/app/api/")).sort()).toEqual([
+      "src/app/api/evaluation/[capability]/route.ts",
       "src/app/api/profile/[capability]/route.ts",
     ]);
     expect(files.some((file) => /service-role|management-token|database-password/i.test(file))).toBe(false);

@@ -38,7 +38,7 @@
       ]
     },
     "RELEVANT": {
-      "description": "Executable-path proof for the current bounded Migration 025 Profile lifecycle-closure increment.",
+      "description": "Executable-path proof for the current bounded Migration 026 Eligibility production-assembly increment.",
       "classification": "heavy",
       "prerequisites": [
         "Docker is running and PostgreSQL 17 plus the current Supabase images are available locally.",
@@ -51,28 +51,24 @@
           "why": "Require safe disk headroom and read-only Docker health evidence before database work."
         },
         {
-          "id": "db.pg17-clean-001-025-non-super",
-          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner through Migration 025."
+          "id": "db.pg17-clean-001-026-non-super",
+          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner through Migration 026."
         },
         {
-          "id": "db.phase025-discovery-security-privacy",
-          "why": "Run Migration 025 owner discovery, ACL, adversarial, and privacy SQL proof."
+          "id": "db.phase026-assembly-security-privacy",
+          "why": "Run Migration 026 assembly, ACL, idempotency, adversarial, and privacy SQL proof."
         },
         {
-          "id": "db.phase025-populated-024-025",
-          "why": "Prove the populated 024 to 025 forward-upgrade leaves existing Profile state unchanged."
+          "id": "db.phase026-populated-025-026",
+          "why": "Prove the populated 025 to 026 forward-upgrade leaves completed Eligibility identity unchanged."
         },
         {
-          "id": "db.phase020-profile-fork-concurrency",
-          "why": "Preserve the existing fork single-active-draft and idempotency concurrency proof used by this lifecycle."
-        },
-        {
-          "id": "db.supabase-reset-001-025",
+          "id": "db.supabase-reset-001-026",
           "why": "Exercise the actual local Supabase migration runner against the complete migration tree."
         },
         {
-          "id": "db.local-auth-postgrest-profile-matrix",
-          "why": "Exercise real local Auth-issued subjects, latest-FROZEN discovery, known read/fork ownership, anonymous, expired, malformed, and unrelated-user boundaries."
+          "id": "db.local-auth-postgrest-phase026",
+          "why": "Exercise real Auth-issued JWTs, direct PostgREST, concurrent exact retry, owner isolation, and closed M026 DTO/error behavior."
         },
         {
           "id": "web.real-local-profile-lifecycle",
@@ -103,15 +99,15 @@
           "why": "Block heavy proof when host disk or read-only Docker health signals are unsafe."
         },
         {
-          "id": "db.pg15-clean-001-025-non-super",
-          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 025."
+          "id": "db.pg15-clean-001-026-non-super",
+          "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 026."
         },
         {
-          "id": "db.pg17-clean-001-025-non-super",
-          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path through Migration 025."
+          "id": "db.pg17-clean-001-026-non-super",
+          "why": "Prove the full PostgreSQL 17 non-superuser clean migration runner path through Migration 026."
         },
         {
-          "id": "db.ordered-sql-001-017",
+          "id": "db.ordered-sql-001-018",
           "why": "Preserve version-scoped ordered SQL suites at their authoritative migration boundaries."
         },
         {
@@ -123,7 +119,11 @@
           "why": "Prove the populated Migration 024 to 025 forward-upgrade contract."
         },
         {
-          "id": "db.supabase-reset-001-025",
+          "id": "db.phase026-populated-025-026",
+          "why": "Prove the populated Migration 025 to 026 forward-upgrade contract."
+        },
+        {
+          "id": "db.supabase-reset-001-026",
           "why": "Prove the actual local Supabase clean runner path."
         },
         {
@@ -133,6 +133,10 @@
         {
           "id": "db.phase025-discovery-security-privacy",
           "why": "Run the complete Migration 025 owner discovery, ACL, adversarial, and privacy suite."
+        },
+        {
+          "id": "db.phase026-assembly-security-privacy",
+          "why": "Run the complete Migration 026 assembly, ACL, idempotency, adversarial, and privacy suite."
         },
         {
           "id": "db.phase024-definition-concurrency",
@@ -147,8 +151,12 @@
           "why": "Run the real local hosted-equivalent Auth/PostgREST Profile security matrix."
         },
         {
-          "id": "db.local-auth-restart-phase025",
-          "why": "Re-run the current Profile lifecycle security E2E after an exact local Auth service restart."
+          "id": "db.local-auth-postgrest-phase026",
+          "why": "Run the real local Auth/JWT/PostgREST M026 concurrent assembly security matrix."
+        },
+        {
+          "id": "db.local-auth-restart-phase026",
+          "why": "Re-run the M026 production assembly E2E after an exact local Auth service restart."
         },
         {
           "id": "backend.eligibility-full",
@@ -208,7 +216,7 @@
         },
         {
           "id": "repo.frozen-invariant-audit",
-          "why": "Fail on Migration 001-024, semantic package, Edge boundary, evaluator, fingerprint, or runtime drift."
+          "why": "Fail on Migration 001-025, semantic package, Edge boundary, evaluator, fingerprint, or runtime drift."
         },
         {
           "id": "repo.diff-check",

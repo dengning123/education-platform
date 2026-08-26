@@ -87,19 +87,18 @@ lockfile. Failure does not cause fallback to a smaller test.
 
 ## RELEVANT
 
-Manifest v1 binds `RELEVANT` to the currently reviewed Migration 025 complete
-Profile lifecycle-closure increment. It is intentionally conservative:
+Manifest v1 binds `RELEVANT` to the currently reviewed Migration 026
+Eligibility production-assembly increment. It is intentionally conservative:
 
 1. heavy read-only disk/Docker preflight;
-2. clean PostgreSQL 17 non-superuser `001→025` runner path;
-3. Phase 025 discovery/security/privacy SQL;
-4. populated `024→025` upgrade;
-5. existing Phase 020 fork concurrency probe;
-6. actual local `supabase db reset --local` path;
-7. Phase 021–025 Auth-issued JWT/PostgREST E2E sequence;
-8. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
-9. targeted Profile command/DTO/source/semantic/no-AI tests;
-10. `git diff --check`.
+2. clean PostgreSQL 17 non-superuser `001→026` runner path;
+3. Phase 026 assembly/security/idempotency/privacy SQL;
+4. populated `025→026` upgrade;
+5. actual local `supabase db reset --local` path;
+6. Phase 026 Auth-issued JWT/PostgREST concurrent assembly E2E;
+7. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
+8. targeted Profile and evaluation command/DTO/source/semantic/no-AI tests;
+9. `git diff --check`.
 
 A future bounded increment needs a reviewed manifest version to change this
 mapping. The runner never infers relevance from changed paths and accepts no
@@ -110,34 +109,37 @@ caller-supplied test file or command.
 `BASELINE` preserves the current complete local final-proof categories:
 
 1. heavy read-only preflight;
-2. PostgreSQL 15 non-superuser clean `001→025`;
-3. PostgreSQL 17 non-superuser clean `001→025`;
-4. version-boundary ordered SQL suites `001–017`;
+2. PostgreSQL 15 non-superuser clean `001→026`;
+3. PostgreSQL 17 non-superuser clean `001→026`;
+4. version-boundary ordered SQL suites `001–018`;
 5. populated `023→024` upgrade;
 6. populated `024→025` upgrade;
-7. actual local Supabase reset;
-8. Phase 024 behavior/security/privacy;
-9. Phase 025 discovery/security/privacy;
-10. Phase 024 definition concurrency;
-11. Phase 020 Profile fork concurrency;
-12. Phase 021–025 real local Auth/PostgREST matrix;
-13. exact local Auth restart followed by Phase 025 E2E;
-14. Eligibility full suite;
-15. Fit Engine full suite;
-16. production adapter full suite;
-17. frozen Edge HTTP boundary suite;
-18. Minimum Beta Operations checker/query-pack tests;
-19. Web unit/contract/security suite;
-20. full fake browser/auth/Profile/accessibility/mobile suite;
-21. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
-22. lint;
-23. TypeScript;
-24. Next.js production build;
-25. client-secret/test-fixture source boundary;
-26. semantic/no-AI executable guards;
-27. frozen Fit runtime rebuild/reproducibility;
-28. frozen Migration 001–024/semantic/Edge/evaluator/fingerprint/runtime audit;
-29. final `git diff --check`.
+7. populated `025→026` upgrade;
+8. actual local Supabase reset;
+9. Phase 024 behavior/security/privacy;
+10. Phase 025 discovery/security/privacy;
+11. Phase 026 assembly/security/idempotency/privacy;
+12. Phase 024 definition concurrency;
+13. Phase 020 Profile fork concurrency;
+14. Phase 021–025 real local Auth/PostgREST matrix;
+15. Phase 026 real local Auth/PostgREST concurrent assembly matrix;
+16. exact local Auth restart followed by Phase 026 E2E;
+17. Eligibility full suite;
+18. Fit Engine full suite;
+19. production adapter full suite;
+20. frozen Edge HTTP boundary suite;
+21. Minimum Beta Operations checker/query-pack tests;
+22. Web unit/contract/security suite;
+23. full fake browser/auth/Profile/accessibility/mobile suite;
+24. real local Browser → Next → Auth → PostgREST → PostgreSQL lifecycle;
+25. lint;
+26. TypeScript;
+27. Next.js production build;
+28. client-secret/test-fixture source boundary;
+29. semantic/no-AI executable guards;
+30. frozen Fit runtime rebuild/reproducibility;
+31. frozen Migration 001–025/semantic/Edge/evaluator/fingerprint/runtime audit;
+32. final `git diff --check`.
 
 The ordered SQL command applies and tests frozen versions at their documented
 boundaries; it does not incorrectly run old negative-leakage tests only after

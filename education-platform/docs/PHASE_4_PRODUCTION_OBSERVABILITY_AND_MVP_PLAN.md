@@ -9,7 +9,7 @@ Frozen baseline: commit `55296e1aeca9a25b066e9010c376f0e618af59d1`,
 tag `phase3-fit-v0.1`
 
 Related data-contract plan:
-[`MIGRATION_026_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_026_APPLICATION_OUTCOME_CONTRACT_PLAN.md)
+[`MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md`](MIGRATION_027_APPLICATION_OUTCOME_CONTRACT_PLAN.md)
 
 ## 1. Objective
 
@@ -22,7 +22,7 @@ usable product loop. It has two immediate workstreams:
    Eligibility, six-dimensional Fit, Financial review, and privacy deletion.
 
 Application tracking and verified outcome collection remain a later lifecycle
-capability under the separately reviewed provisional Migration 026 contract.
+capability under the separately reviewed provisional Migration 027 contract.
 They are strategically useful for future outcome evidence, but they are not a
 prerequisite for completing the first Profile → Eligibility → Fit decision
 loop and require separate implementation authorization.
@@ -113,7 +113,7 @@ Profile backend core, Migration 020 is the Frozen Profile to new DRAFT fork,
 Migration 021 is the hosted Auth subject compatibility repair, Migration 022
 is the owner-scoped Profile taxonomy projection, and Migration 023 is the
 bounded ASSESSMENT/SKILL taxonomy options capability. The Application/Outcome
-plan now has a provisional future Migration 026 identity;
+plan now has a provisional future Migration 027 identity;
 that number remains provisional until implementation authorization. Any
 durable database operation receipt or trace table requires a separate additive
 migration after the implemented Application/Outcome migration.
@@ -348,7 +348,7 @@ New API surface is grouped by capability rather than one endpoint per table:
 - Eligibility v0.2 evaluation orchestration;
 - the existing Fit and Financial endpoints;
 - privacy export/deletion orchestration;
-- later Application/Outcome commands only after provisional Migration 026 is
+- later Application/Outcome commands only after provisional Migration 027 is
   separately implemented and authorized.
 
 ### 4.5 Reviewer flow
@@ -428,9 +428,9 @@ foundation work exists.
 
 ### Gate D — Application/Outcome enablement
 
-- Migration 026 receives independent design approval and implementation
+- Migration 027 receives independent design approval and implementation
   authorization;
-- clean `001→026`, populated `025→026`, RLS, concurrency, privacy, and remote
+- clean `001→027`, populated `026→027`, RLS, concurrency, privacy, and remote
   smoke gates pass;
 - outcome evidence/reviewer policy and research-consent copy are approved;
 - no Competitiveness training or inference job exists.
