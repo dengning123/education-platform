@@ -42,7 +42,7 @@
       ]
     },
     "RELEVANT": {
-      "description": "Executable-path proof for the M029 transaction-bound M027 privacy-deletion compatibility repair.",
+      "description": "Executable-path proof for M030 HAS_DEGREE_LEVEL while retaining the complete prior M029 relevant proof.",
       "classification": "heavy",
       "prerequisites": [
         "Docker is running and PostgreSQL 17 plus the current Supabase images are available locally.",
@@ -53,6 +53,26 @@
         {
           "id": "preflight.heavy",
           "why": "Require safe disk headroom and read-only Docker health evidence before database work."
+        },
+        {
+          "id": "db.pg17-clean-001-030-non-super",
+          "why": "Exercise the target hosted-compatible PostgreSQL 17 non-superuser migration runner through Migration 030."
+        },
+        {
+          "id": "db.phase030-degree-security-privacy",
+          "why": "Prove M030 degree truth, authority pins, ACL, idempotency, adversarial, and privacy behavior."
+        },
+        {
+          "id": "db.phase030-populated-029-030",
+          "why": "Prove M030 is additive over populated M029 state and preserves completed legacy Eligibility rows."
+        },
+        {
+          "id": "db.phase030-degree-concurrency",
+          "why": "Prove concurrent exact operation replay converges to one degree evaluation and receipt."
+        },
+        {
+          "id": "db.supabase-reset-001-030",
+          "why": "Exercise the actual local Supabase migration runner against the complete 001 to 030 tree."
         },
         {
           "id": "db.pg17-clean-001-029-non-super",
@@ -131,6 +151,18 @@
           "why": "Block heavy proof when host disk or read-only Docker health signals are unsafe."
         },
         {
+          "id": "db.pg15-clean-001-030-non-super",
+          "why": "Add PostgreSQL 15 clean non-superuser proof through Migration 030 without removing the prior baseline gate."
+        },
+        {
+          "id": "db.pg17-clean-001-030-non-super",
+          "why": "Add PostgreSQL 17 clean non-superuser proof through Migration 030 without removing the prior baseline gate."
+        },
+        {
+          "id": "db.ordered-sql-001-022",
+          "why": "Add the ordered M030 migration/test boundary while retaining every prior ordered-suite proof."
+        },
+        {
           "id": "db.pg15-clean-001-029-non-super",
           "why": "Prove the full PostgreSQL 15 non-superuser clean migration runner path through Migration 029."
         },
@@ -167,6 +199,14 @@
           "why": "Prove populated M027 state is byte-semantic stable across M029 and deletable only through the authorized lifecycle."
         },
         {
+          "id": "db.phase030-populated-029-030",
+          "why": "Prove populated M029 state remains byte-semantic stable across additive M030."
+        },
+        {
+          "id": "db.supabase-reset-001-030",
+          "why": "Add actual local Supabase clean-runner proof through M030 without removing the prior reset gate."
+        },
+        {
           "id": "db.supabase-reset-001-029",
           "why": "Prove the actual local Supabase clean runner path."
         },
@@ -195,6 +235,10 @@
           "why": "Run the M029 authorized-cascade, direct-role, spoof, stale, cross-student, rollback, and zero-residue suite."
         },
         {
+          "id": "db.phase030-degree-security-privacy",
+          "why": "Run M030 degree matrix, truth, authority, fingerprint, ACL, adversarial, idempotency, and privacy proof."
+        },
+        {
           "id": "db.phase024-definition-concurrency",
           "why": "Preserve the Migration 024 definition concurrency proof."
         },
@@ -209,6 +253,10 @@
         {
           "id": "db.phase029-privacy-concurrency",
           "why": "Prove privacy deletion shares the established lifecycle lock order with mutation, freeze, and Fit evaluation."
+        },
+        {
+          "id": "db.phase030-degree-concurrency",
+          "why": "Prove concurrent exact M030 assembly replay converges without duplicate evaluation state."
         },
         {
           "id": "db.local-auth-postgrest-profile-matrix",

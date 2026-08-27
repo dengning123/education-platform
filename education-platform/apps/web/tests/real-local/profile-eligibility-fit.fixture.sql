@@ -95,11 +95,111 @@ select public.verify_program_requirement_rule_set(
   :'fixture_catalog_evidence_id'::uuid
 );
 
+-- M030 degree-only product path. The source is deliberately classified as a
+-- local synthetic Eligibility rule; it is never seed or production catalog
+-- data. The program record and source revision remain the golden fixture.
+select public.create_evidence_scope(
+  :'fixture_catalog_evidence_id'::uuid,
+  'PROGRAM_VERSION',
+  :'fixture_program_version_id'::uuid,
+  'degree_requirement_level_v030',
+  'UNSPECIFIED', 'UNSPECIFIED', 'UNSPECIFIED'
+) as scope_id
+\gset degree_applicability_
+
+select public.review_evidence_applicability(
+  :'degree_applicability_scope_id'::uuid,
+  'REVIEWED_APPLICABLE',
+  'phase4b-local-e2e-reviewer',
+  'GOLDEN PROGRAM RECORD + SYNTHETIC M030 DEGREE RULE'
+) as assertion_id
+\gset degree_applicability_
+
+select public.create_field_observation(
+  'PROGRAM_VERSION',
+  :'fixture_program_version_id'::uuid,
+  'degree_requirement_level_v030',
+  to_jsonb('BACHELORS'::text),
+  'KNOWN',
+  :'fixture_catalog_evidence_id'::uuid,
+  null,
+  'Phase 4B local-only typed BACHELORS requirement fixture.',
+  :'degree_applicability_assertion_id'::uuid
+) as observation_id
+\gset degree_fixture_
+
+select public.select_field_observation(
+  :'degree_fixture_observation_id'::uuid,
+  'phase4b-local-e2e-reviewer'
+);
+
+select public.create_program_degree_requirement_v030(
+  'PROGRAM:LOCAL_E2E:DEGREE_LEVEL',
+  1,
+  :'fixture_program_version_id'::uuid,
+  (select upper(admission_cycle) from public.program_versions
+   where program_version_id = :'fixture_program_version_id'::uuid),
+  'BACHELORS',
+  :'degree_fixture_observation_id'::uuid
+) as degree_requirement_id
+\gset degree_fixture_
+
+select public.verify_program_degree_requirement_v030(
+  :'degree_fixture_degree_requirement_id'::uuid,
+  'phase4b-local-e2e-reviewer'
+);
+
+select public.create_requirement_rule_set(jsonb_populate_record(
+  null::public.program_requirement_rule_sets,
+  jsonb_build_object(
+    'rule_set_id', '4b400000-0000-4000-8000-000000000030'::uuid,
+    'program_version_id', :'fixture_program_version_id'::uuid,
+    'rule_set_version', 9430,
+    'taxonomy_release_code', 'v0.1',
+    'rule_schema_version', 'phase2-degree-v1',
+    'engine_contract_version', 'eligibility-degree-v1'
+  )
+));
+
+select public.insert_requirement_node(jsonb_populate_record(
+  null::public.program_requirement_nodes,
+  jsonb_build_object(
+    'rule_node_id', '4b400000-0000-4000-8000-000000000031'::uuid,
+    'rule_set_id', '4b400000-0000-4000-8000-000000000030'::uuid,
+    'sort_order', 0,
+    'node_kind', 'PREDICATE',
+    'predicate_kind', 'HAS_DEGREE_LEVEL',
+    'requirement_strength', 'HARD',
+    'requirement_semantics', 'ORDINARY',
+    'target_concept_id', null,
+    'explanation_template', 'The synthetic local rule requires a completed bachelors-level degree.'
+  )
+));
+
+select public.insert_requirement_node_source(jsonb_populate_record(
+  null::public.program_requirement_node_sources,
+  jsonb_build_object(
+    'rule_node_id', '4b400000-0000-4000-8000-000000000031'::uuid,
+    'field_observation_id', :'degree_fixture_observation_id'::uuid
+  )
+));
+
+select public.insert_program_degree_predicate_v030(
+  '4b400000-0000-4000-8000-000000000031'::uuid,
+  :'degree_fixture_degree_requirement_id'::uuid
+);
+
+select public.verify_program_requirement_rule_set_degree_v030(
+  '4b400000-0000-4000-8000-000000000030'::uuid,
+  'phase4b-local-e2e-reviewer',
+  :'fixture_catalog_evidence_id'::uuid
+);
+
 commit;
 
 select jsonb_build_object(
   'classification', 'GOLDEN PROGRAM RECORD + SYNTHETIC ELIGIBILITY RULES',
   'profileVersionId', :'profile_version_id'::uuid,
   'programVersionId', :'fixture_program_version_id'::uuid,
-  'ruleSetId', '4b400000-0000-4000-8000-000000000001'::uuid
+  'ruleSetId', '4b400000-0000-4000-8000-000000000030'::uuid
 );

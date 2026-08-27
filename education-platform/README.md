@@ -38,7 +38,7 @@ product-aware Fit input/manifest compatibility build without changing Fit
 v0.1 semantics. Migration `029` adds only the transaction-bound M027 privacy-
 deletion compatibility repair. None of `019`–`029` has been deployed. The
 separately planned Application/Outcome contract has a provisional future
-Migration `030` identity and remains unimplemented pending separate
+Migration `031` identity and remains unimplemented pending separate
 implementation authorization.
 
 The frozen SQL suites are version-scoped. PostgreSQL 15 retains the original
@@ -337,13 +337,13 @@ data collection, or deployment, and it preserves Eligibility as rule logic and
 Fit as categorical preference/constraint semantics.
 
 The proposed Application/Outcome data contract is
-[docs/MIGRATION_030_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_030_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
-No Migration 030 Application/Outcome SQL, Application/Outcome runtime, or
+[docs/MIGRATION_031_APPLICATION_OUTCOME_CONTRACT_PLAN.md](docs/MIGRATION_031_APPLICATION_OUTCOME_CONTRACT_PLAN.md).
+No Migration 031 Application/Outcome SQL, Application/Outcome runtime, or
 Competitiveness model is implemented or authorized by those documents.
 Migration 027 is the local-only Real Student Fit Intent capability;
 Migration 028 is the local-only Fit product manifest compatibility build
 registration; Migration 029 is the local-only M027 privacy-deletion
-compatibility repair; Migration 030 remains the provisional
+compatibility repair; Migration 031 remains the provisional
 Application/Outcome identity until separate implementation authorization.
 The original Migration 020 plan disposition is preserved as historical
 provenance in

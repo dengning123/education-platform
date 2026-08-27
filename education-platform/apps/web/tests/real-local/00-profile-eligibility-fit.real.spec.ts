@@ -301,7 +301,8 @@ test("real Browser to frozen Profile to Eligibility to Fit remains owner-scoped 
   const aliceEligibilityReplay = await post(alicePage, "/api/evaluation/eligibility", aliceEligibilityRequest);
   expect(aliceEligibilityReplay.status).toBe(200);
   expect(data(aliceEligibilityReplay)).toEqual(aliceEligibility);
-  expect(database(`select count(*) from private.eligibility_assembly_operations_v026 where operation_id = '${aliceEligibilityOperationId}'::uuid;`)).toBe("1");
+  expect(database(`select count(*) from private.eligibility_degree_operations_v030 where operation_id = '${aliceEligibilityOperationId}'::uuid and execution_mode = 'DEGREE';`)).toBe("1");
+  expect(database(`select count(*) from public.eligibility_evaluations where evaluation_id = '${aliceEligibility.evalId}'::uuid and input_schema_version = 'eligibility-degree-v1';`)).toBe("1");
 
   const bobEligibilityResponse = await post(bobPage, "/api/evaluation/eligibility", {
     profileVersionId: bobProfile, programVersionId: fixture.programVersionId, operationId: randomUUID(),
@@ -456,6 +457,8 @@ test("real Browser to frozen Profile to Eligibility to Fit remains owner-scoped 
   cleanupStudents();
   resetLocalDatabase();
   expect(database("select count(*) from public.program_requirement_rule_sets where rule_set_id = '4b400000-0000-4000-8000-000000000001'::uuid;")).toBe("0");
+  expect(database("select count(*) from public.program_requirement_rule_sets where rule_set_id = '4b400000-0000-4000-8000-000000000030'::uuid;")).toBe("0");
+  expect(database("select count(*) from private.eligibility_degree_operations_v030;")).toBe("0");
   expect(database("select count(*) from public.fit_intent_sets;")).toBe("0");
   expect(database("select count(*) from private.fit_intent_product_states_v027;")).toBe("0");
 });

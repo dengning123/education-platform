@@ -89,7 +89,7 @@ export class SupabaseEvaluationService implements EvaluationService {
   async eligibility(input: EligibilityConnectionRequest): Promise<EligibilityConnectionResult> {
     let result: Readonly<{ data: unknown; error: unknown }>;
     try {
-      result = await this.supabase.rpc("assemble_eligibility_evaluation_v026", {
+      result = await this.supabase.rpc("assemble_eligibility_evaluation_v030", {
         p_profile_version_id: input.profileVersionId,
         p_program_version_id: input.programVersionId,
         p_operation_id: input.operationId,

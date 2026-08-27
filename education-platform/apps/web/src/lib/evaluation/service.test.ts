@@ -62,7 +62,7 @@ describe("Fit same-origin secure proxy service", () => {
       profileVersionId: id("1"), programVersionId: id("3"), operationId: id("30"),
     });
     expect(result.evalId).toBe(id("20"));
-    expect(client.rpc).toHaveBeenCalledWith("assemble_eligibility_evaluation_v026", {
+    expect(client.rpc).toHaveBeenCalledWith("assemble_eligibility_evaluation_v030", {
       p_profile_version_id: id("1"), p_program_version_id: id("3"), p_operation_id: id("30"),
     });
     expect(JSON.stringify(result)).not.toContain("alice-session-jwt");
